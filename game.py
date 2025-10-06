@@ -5,9 +5,28 @@ import sys
 main_clock = pygame.time.Clock()
 pygame.init()
 pygame.display.set_caption('Super Snake Battle Royale Ultimate')
+# Credit for music goes to Newgrounds user ZaneLittle: https://www.newgrounds.com/audio/listen/1475739
 screen = pygame.display.set_mode((0, 0))
 SCREEN_WIDTH, SCREEN_HEIGHT = screen.get_width(), screen.get_height()
 font = pygame.font.SysFont(None, 100)
+
+
+def play_main_menu_music():
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load('./music/main_menu_music.wav')
+    pygame.mixer.music.play(-1)
+
+
+def play_game_music():
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load('./music/game_music.wav')
+    pygame.mixer.music.play(-1)
+
+
+def play_sim_music():
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load('./music/sim_music.wav')
+    pygame.mixer.music.play(-1)
 
 
 def draw_button(surface, button, text, font, bg_color, text_color):
@@ -68,6 +87,8 @@ click = False  # Boolean flag for click events
 
 def main_menu():
     """The menu game loop. Handles all main menu logic."""
+    # Start menu music
+    play_main_menu_music()
     while True:
         screen.fill((250, 250, 250))
         draw_text('main menu', font,
@@ -138,6 +159,7 @@ def main_menu():
 
 def start_game():
     """The actual game loop. Handles all snake game logic."""
+    play_game_music()
     running = True
     while running:
         # Clear screen at beginning of the frame with white
@@ -150,6 +172,8 @@ def start_game():
                 sys.exit()
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
+                    # Switch back to main menu music
+                    play_main_menu_music()
                     running = False
 
         pygame.display.update()
@@ -158,6 +182,7 @@ def start_game():
 
 def start_sim():
     """The simulation game loop. Handles all simulation logic."""
+    play_sim_music()
     running = True
     while running:
         # Clear screen at beginning of the frame with white
@@ -170,6 +195,8 @@ def start_sim():
                 sys.exit()
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
+                    # Switch back to main menu music
+                    play_main_menu_music()
                     running = False
 
         pygame.display.update()
@@ -182,8 +209,24 @@ def settings():
     while running:
         # Clear screen at beginning of the frame with white
         screen.fill((250, 250, 250))
-        draw_text('haha nothing for you to change here', font,
+        draw_text('Settings', font,
                   (5, 15, 10), screen, SCREEN_WIDTH//2, 100)
+
+        setting_label = pygame.font.SysFont(None, 75)
+
+        draw_text('Volume', setting_label, (5, 15, 10),
+                  screen, SCREEN_WIDTH//2.5, 250)
+        slider_rect = pygame.Rect(
+            SCREEN_WIDTH//1.75, 250, 200, 10)  # Slider track
+        # Calculate the x coordinate of the slider handle (default
+        # volume set at 100%)
+        handle_x = SCREEN_WIDTH//1.75 + slider_rect.width
+        handle_rect = pygame.Rect(handle_x, 245, 10, 20)  # Slider handle
+
+        pygame.draw.rect(screen, (100, 100, 100), slider_rect)  # Draw track
+        pygame.draw.rect(screen, (200, 200, 200), handle_rect)  # Draw handle
+
+        dragging = False
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
@@ -191,6 +234,19 @@ def settings():
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
                     running = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if handle_rect.collidepoint(event.pos):
+                    dragging = True
+            elif event.type == pygame.MOUSEBUTTONUP:
+                dragging = False
+            elif event.type == pygame.MOUSEMOTION and dragging:
+                # Constrain handle movement within slider_rect
+                handle_rect.x = max(slider_rect.left, min(
+                    event.pos[0], slider_rect.right - handle_rect.width))
+
+        volume = (handle_rect.centerx - slider_rect.left) / \
+            slider_rect.width
+        pygame.mixer.music.set_volume(volume)
 
         pygame.display.update()
         main_clock.tick(60)
