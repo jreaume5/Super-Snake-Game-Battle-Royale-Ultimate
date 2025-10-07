@@ -1,14 +1,142 @@
 from pygame.locals import *
+from pygame.math import Vector2
 import pygame
 import sys
+import random
+
+
+class Main:
+    def __init__(self):
+        self.snake = Snake()
+        self.food = Food()
+
+    def update(self):
+        self.snake.move()
+        self.check_collisions()
+
+    def draw_elements(self):
+        self.food.draw()
+        self.snake.draw()
+
+    def check_collisions(self):
+        # Check if the head of the snake hits a screen border
+        head = self.snake.body[0]
+        if not 0 <= head.x < num_cells or not 0 <= head.y < num_cells:
+            self.game_over()
+
+        # Check if the snake ate food and draw new food
+        if self.snake.body[0] == self.food.pos:
+            self.snake.grow()
+            self.food.set_random_pos()
+
+        # Check if the head of the snake hits itself
+        for body_segment in self.snake.body[1:]:
+            if head == body_segment:
+                self.game_over()
+
+    def game_over(self):
+        pygame.quit()
+        sys.exit()
+
+
+class Food:
+    def __init__(self):
+        self.set_random_pos()
+
+    def draw(self):
+        food_rect = pygame.Rect(int(self.pos.x * cell_size),
+                                int(self.pos.y * cell_size), cell_size, cell_size)
+        pygame.draw.rect(screen, (227, 255, 69), food_rect)
+
+    def set_random_pos(self):
+        self.x = random.randint(0, num_cells - 1)
+        self.y = random.randint(0, num_cells - 1)
+        self.pos = pygame.math.Vector2(self.x, self.y)
+
+
+class Snake:
+    def __init__(self):
+        self.body = [pygame.Vector2(6, 10), Vector2(5, 10), Vector2(4, 10)]
+        self.length = len(self.body)
+        self.direction = Vector2(1, 0)  # Snake moves to the right by default
+
+    def draw(self):
+        for body_segment in self.body:
+            x = int(body_segment.x * cell_size)
+            y = int(body_segment.y * cell_size)
+
+            # Draw snake body with outside border
+            body_rect = pygame.Rect(x, y, cell_size, cell_size)
+            pygame.draw.rect(screen, (3, 252, 86), body_rect)
+
+            # Check the neighbor of each body segment to decide which
+            # sides need borders
+            left = pygame.Vector2(body_segment.x-1, body_segment.y)
+            right = pygame.Vector2(body_segment.x+1, body_segment.y)
+            up = pygame.Vector2(body_segment.x, body_segment.y-1)
+            down = pygame.Vector2(body_segment.x, body_segment.y+1)
+
+            # Draw black border around the snake body
+            if left not in self.body:
+                pygame.draw.line(screen, (0, 0, 0),
+                                 body_rect.topleft, body_rect.bottomleft, 2)
+            if right not in self.body:
+                pygame.draw.line(screen, (0, 0, 0),
+                                 body_rect.topright, body_rect.bottomright, 2)
+            if up not in self.body:
+                pygame.draw.line(screen, (0, 0, 0),
+                                 body_rect.topleft, body_rect.topright, 2)
+            if down not in self.body:
+                pygame.draw.line(screen, (0, 0, 0),
+                                 body_rect.bottomleft, body_rect.bottomright, 2)
+
+    def move(self):
+        # Copy all body segments except for the last
+        body_copy = self.body[:-1]
+        # Move the head forward
+        body_copy.insert(0, body_copy[0] + self.direction)
+        self.body = body_copy[:]  # Update the coordinates of the actual snake
+
+    def grow(self):
+        self.body.append(self.body[-1])
+        self.length += 1
+
 
 main_clock = pygame.time.Clock()
 pygame.init()
 pygame.display.set_caption('Super Snake Battle Royale Ultimate')
 # Credit for music goes to Newgrounds user ZaneLittle: https://www.newgrounds.com/audio/listen/1475739
-screen = pygame.display.set_mode((0, 0))
+cell_size = 40
+num_cells = 20
+screen = pygame.display.set_mode(
+    (num_cells * cell_size, num_cells * cell_size))
+
+# screen = pygame.display.set_mode((0, 0))
 SCREEN_WIDTH, SCREEN_HEIGHT = screen.get_width(), screen.get_height()
+
 font = pygame.font.SysFont(None, 100)
+click = False  # Boolean flag for click events
+
+
+def play_main_menu_music():
+    """Plays the main menu music"""
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load('./music/main_menu_music.wav')
+    pygame.mixer.music.play(-1)
+
+
+def play_game_music():
+    """Plays the game music"""
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load('./music/game_music.wav')
+    pygame.mixer.music.play(-1)
+
+
+def play_sim_music():
+    """Plays the simulation music"""
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load('./music/sim_music.wav')
+    pygame.mixer.music.play(-1)
 
 
 def play_main_menu_music():
@@ -82,9 +210,6 @@ def draw_text(text, font, color, surface, x, y, center=True):
     surface.blit(text_obj, text_rect)  # BLIT text to the surface
 
 
-click = False  # Boolean flag for click events
-
-
 def main_menu():
     """The menu game loop. Handles all main menu logic."""
     # Start menu music
@@ -131,8 +256,8 @@ def main_menu():
 
         # Draw the buttons to the main menu screen
         for button, label, button_color in menu_buttons:
-            draw_button(screen, button, label, font, button_color, (0, 0, 0))
-
+            draw_button(screen, button, label, font,
+                        button_color, (0, 0, 0))
             # Check if the user clicks a menu button
             if button.collidepoint((mouse_x, mouse_y)) and click:
                 if label == "Start Game":
@@ -159,13 +284,18 @@ def main_menu():
 
 def start_game():
     """The actual game loop. Handles all snake game logic."""
+    food = Food()
+    main_game = Main()
+    # Trigger screen update event every 150ms
+    UPDATE_SCREEN = pygame.USEREVENT
+    pygame.time.set_timer(UPDATE_SCREEN, 150)
     play_game_music()
     running = True
     while running:
         # Clear screen at beginning of the frame with white
         screen.fill((250, 250, 250))
-        draw_text('welcome to the game', font,
-                  (5, 15, 10), screen, SCREEN_WIDTH//2, 100)
+        draw_text('welcome to the game', font, (5, 15, 10),
+                  screen, SCREEN_WIDTH//2, 100)
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
@@ -175,9 +305,20 @@ def start_game():
                     # Switch back to main menu music
                     play_main_menu_music()
                     running = False
+                if event.key == K_UP and main_game.snake.direction != (0, 1):
+                    main_game.snake.direction = (0, -1)
+                if event.key == K_DOWN and main_game.snake != (0, -1):
+                    main_game.snake.direction = (0, 1)
+                if event.key == K_LEFT and main_game.snake != (1, 0):
+                    main_game.snake.direction = (-1, 0)
+                if event.key == K_RIGHT and main_game.snake != (-1, 0):
+                    main_game.snake.direction = (1, 0)
+            if event.type == UPDATE_SCREEN:
+                main_game.update()
 
-        pygame.display.update()
-        main_clock.tick(60)
+            main_game.draw_elements()
+            pygame.display.update()
+            main_clock.tick(60)
 
 
 def start_sim():
@@ -187,7 +328,7 @@ def start_sim():
     while running:
         # Clear screen at beginning of the frame with white
         screen.fill((250, 250, 250))
-        draw_text('this is placeholder text for the simulation', font,
+        draw_text('this is the simulation', font,
                   (5, 15, 10), screen, SCREEN_WIDTH//2, 100)
         for event in pygame.event.get():
             if event.type == QUIT:
@@ -198,7 +339,6 @@ def start_sim():
                     # Switch back to main menu music
                     play_main_menu_music()
                     running = False
-
         pygame.display.update()
         main_clock.tick(60)
 
@@ -209,8 +349,7 @@ def settings():
     while running:
         # Clear screen at beginning of the frame with white
         screen.fill((250, 250, 250))
-        draw_text('Settings', font,
-                  (5, 15, 10), screen, SCREEN_WIDTH//2, 100)
+        draw_text('Settings', font, (5, 15, 10), screen, SCREEN_WIDTH//2, 100)
 
         setting_label = pygame.font.SysFont(None, 75)
 
@@ -250,6 +389,10 @@ def settings():
 
         pygame.display.update()
         main_clock.tick(60)
+
+
+def game_over():
+    None  # Unimplemented
 
 
 main_menu()
