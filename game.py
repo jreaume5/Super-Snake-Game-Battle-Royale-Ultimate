@@ -216,7 +216,7 @@ def start_game():
     """The actual game loop. Handles all snake game logic."""
     UPDATE_SCREEN = pygame.USEREVENT
     # Triggers screen update event every 150ms
-    pygame.time.set_timer(UPDATE_SCREEN, 150)
+    pygame.time.set_timer(UPDATE_SCREEN, 130)
     play_game_music()
     running = True
     while running:
@@ -234,13 +234,13 @@ def start_game():
                     # Switch back to main menu music
                     play_main_menu_music()
                     running = False
-                if event.key == K_UP:
+                if event.key == K_UP and snake.direction != (0, 1):
                     snake.direction = (0, -1)
-                if event.key == K_DOWN:
+                if event.key == K_DOWN and snake.direction != (0, -1):
                     snake.direction = (0, 1)
-                if event.key == K_LEFT:
+                if event.key == K_LEFT and snake.direction != (1, 0):
                     snake.direction = (-1, 0)
-                if event.key == K_RIGHT:
+                if event.key == K_RIGHT and snake.direction != (-1, 0):
                     snake.direction = (1, 0)
             if event.type == UPDATE_SCREEN:
                 snake.move()
