@@ -79,11 +79,20 @@ while game_running:
         del snake_body[0]
 
     #check collison between two snake head and body
-    if len(snake_body) > 1 and snake.collidedict(snake_body[i] for i in range(1, len(snake_body))):
+    if len(snake_body) > 1 and snake.colliderect(snake_body[i] for i in range(1, len(snake_body))):
         game_running = False
 
 
+#we want to display the game message and the final score after we do with the game
+game_over_font = pygame.font.Font(None, 48) #it takes (name, size)
+game_over_text = game_over_font.render("Game Over", True, (255, 255, 255)) #text with white color
 
+#we need font for the score
+score_font = pygame.font.Font(None, 35)
+score_text = score_font.render("Final Score: " + str(score), True, (255, 255,255) ) #we have text "Final Score: " wiht the score 
+
+#game_window.blit(game_over_text, (width // 2 - game_over_text.get_width() // 2, height // 2 - 48))
+#I will continue working on this - Deep
 
 pygame.quit()
 sys.exit()
