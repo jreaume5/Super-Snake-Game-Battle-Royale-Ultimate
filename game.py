@@ -2,21 +2,71 @@ from pygame.locals import *
 from pygame.math import Vector2
 import pygame
 import sys
+import random
 
 
-class SNAKE:
+class Main:
     def __init__(self):
-        self.body = [pygame.Vector2(5, 10), Vector2(6, 10), Vector2(7, 10)]
+        self.snake = Snake()
+        self.food = Food()
+
+    def update(self):
+        self.snake.move()
+        self.check_collisions()
+
+    def draw_elements(self):
+        self.food.draw()
+        self.snake.draw()
+
+    def check_collisions(self):
+        # Check if the head of the snake hits a screen border
+        head = self.snake.body[0]
+        if not 0 <= head.x < num_cells or not 0 <= head.y < num_cells:
+            self.game_over()
+
+        # Check if the snake ate food and draw new food
+        if self.snake.body[0] == self.food.pos:
+            self.snake.grow()
+            self.food.set_random_pos()
+
+        # Check if the head of the snake hits itself
+        for body_segment in self.snake.body[1:]:
+            if head == body_segment:
+                self.game_over()
+
+    def game_over(self):
+        pygame.quit()
+        sys.exit()
+
+
+class Food:
+    def __init__(self):
+        self.set_random_pos()
+
+    def draw(self):
+        food_rect = pygame.Rect(int(self.pos.x * cell_size),
+                                int(self.pos.y * cell_size), cell_size, cell_size)
+        pygame.draw.rect(screen, (227, 255, 69), food_rect)
+
+    def set_random_pos(self):
+        self.x = random.randint(0, num_cells - 1)
+        self.y = random.randint(0, num_cells - 1)
+        self.pos = pygame.math.Vector2(self.x, self.y)
+
+
+class Snake:
+    def __init__(self):
+        self.body = [pygame.Vector2(6, 10), Vector2(5, 10), Vector2(4, 10)]
         self.length = len(self.body)
         self.direction = Vector2(1, 0)  # Snake moves to the right by default
 
-    def draw_snake(self):
+    def draw(self):
         for body_segment in self.body:
-            x_pos = int(body_segment.x * cell_size)
-            y_pos = int(body_segment.y * cell_size)
+            x = int(body_segment.x * cell_size)
+            y = int(body_segment.y * cell_size)
 
             # Draw snake body with outside border
-            body_rect = pygame.Rect(x_pos, y_pos, cell_size, cell_size)
+            body_rect = pygame.Rect(x, y, cell_size, cell_size)
             pygame.draw.rect(screen, (3, 252, 86), body_rect)
 
             # Check the neighbor of each body segment to decide which
@@ -47,6 +97,10 @@ class SNAKE:
         body_copy.insert(0, body_copy[0] + self.direction)
         self.body = body_copy[:]  # Update the coordinates of the actual snake
 
+    def grow(self):
+        self.body.append(self.body[-1])
+        self.length += 1
+
 
 main_clock = pygame.time.Clock()
 pygame.init()
@@ -62,8 +116,6 @@ SCREEN_WIDTH, SCREEN_HEIGHT = screen.get_width(), screen.get_height()
 
 font = pygame.font.SysFont(None, 100)
 click = False  # Boolean flag for click events
-
-snake = SNAKE()
 
 
 def play_main_menu_music():
@@ -214,9 +266,11 @@ def main_menu():
 
 def start_game():
     """The actual game loop. Handles all snake game logic."""
+    food = Food()
+    main_game = Main()
+    # Trigger screen update event every 150ms
     UPDATE_SCREEN = pygame.USEREVENT
-    # Triggers screen update event every 150ms
-    pygame.time.set_timer(UPDATE_SCREEN, 130)
+    pygame.time.set_timer(UPDATE_SCREEN, 150)
     play_game_music()
     running = True
     while running:
@@ -224,7 +278,6 @@ def start_game():
         screen.fill((250, 250, 250))
         draw_text('welcome to the game', font, (5, 15, 10),
                   screen, SCREEN_WIDTH//2, 100)
-        snake.draw_snake()
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
@@ -234,17 +287,18 @@ def start_game():
                     # Switch back to main menu music
                     play_main_menu_music()
                     running = False
-                if event.key == K_UP and snake.direction != (0, 1):
-                    snake.direction = (0, -1)
-                if event.key == K_DOWN and snake.direction != (0, -1):
-                    snake.direction = (0, 1)
-                if event.key == K_LEFT and snake.direction != (1, 0):
-                    snake.direction = (-1, 0)
-                if event.key == K_RIGHT and snake.direction != (-1, 0):
-                    snake.direction = (1, 0)
+                if event.key == K_UP and main_game.snake.direction != (0, 1):
+                    main_game.snake.direction = (0, -1)
+                if event.key == K_DOWN and main_game.snake != (0, -1):
+                    main_game.snake.direction = (0, 1)
+                if event.key == K_LEFT and main_game.snake != (1, 0):
+                    main_game.snake.direction = (-1, 0)
+                if event.key == K_RIGHT and main_game.snake != (-1, 0):
+                    main_game.snake.direction = (1, 0)
             if event.type == UPDATE_SCREEN:
-                snake.move()
+                main_game.update()
 
+            main_game.draw_elements()
             pygame.display.update()
             main_clock.tick(60)
 
@@ -317,6 +371,10 @@ def settings():
 
         pygame.display.update()
         main_clock.tick(60)
+
+
+def game_over():
+    None  # Unimplemented
 
 
 main_menu()
