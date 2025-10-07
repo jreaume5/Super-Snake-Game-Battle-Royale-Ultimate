@@ -139,6 +139,24 @@ def play_sim_music():
     pygame.mixer.music.play(-1)
 
 
+def play_main_menu_music():
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load('./music/main_menu_music.wav')
+    pygame.mixer.music.play(-1)
+
+
+def play_game_music():
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load('./music/game_music.wav')
+    pygame.mixer.music.play(-1)
+
+
+def play_sim_music():
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load('./music/sim_music.wav')
+    pygame.mixer.music.play(-1)
+
+
 def draw_button(surface, button, text, font, bg_color, text_color):
     """Draws a rectangular button with centered text to a surface.
 
