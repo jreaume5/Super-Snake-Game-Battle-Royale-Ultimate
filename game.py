@@ -9,6 +9,7 @@ class Main:
     def __init__(self):
         self.snake = Snake()
         self.food = Food()
+        self.food.set_random_pos(self.snake.body)
 
     def update(self):
         self.snake.move()
@@ -27,7 +28,7 @@ class Main:
         # Check if the snake ate food and draw new food
         if self.snake.body[0] == self.food.pos:
             self.snake.grow()
-            self.food.set_random_pos()
+            self.food.set_random_pos(self.snake.body)
 
         # Check if the head of the snake hits itself
         for body_segment in self.snake.body[1:]:
@@ -40,18 +41,21 @@ class Main:
 
 
 class Food:
-    def __init__(self):
-        self.set_random_pos()
-
     def draw(self):
         food_rect = pygame.Rect(int(self.pos.x * cell_size),
                                 int(self.pos.y * cell_size), cell_size, cell_size)
         pygame.draw.rect(screen, (227, 255, 69), food_rect)
 
-    def set_random_pos(self):
-        self.x = random.randint(0, num_cells - 1)
-        self.y = random.randint(0, num_cells - 1)
-        self.pos = pygame.math.Vector2(self.x, self.y)
+    def set_random_pos(self, snake_body):
+        respawn = True
+        while True:
+            self.x = random.randint(0, num_cells - 1)
+            self.y = random.randint(0, num_cells - 1)
+            self.pos = pygame.math.Vector2(self.x, self.y)
+
+            # Check to make sure the food doesn't spawn inside the snake body
+            if self.pos not in snake_body:
+                return
 
 
 class Snake:
@@ -284,7 +288,6 @@ def main_menu():
 
 def start_game():
     """The actual game loop. Handles all snake game logic."""
-    food = Food()
     main_game = Main()
     # Trigger screen update event every 150ms
     UPDATE_SCREEN = pygame.USEREVENT
