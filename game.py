@@ -69,14 +69,14 @@ class Snake:
             body_rect = pygame.Rect(x, y, cell_size, cell_size)
             pygame.draw.rect(screen, (3, 252, 86), body_rect)
 
-            # Check the neighbor of each body segment to decide which
-            # sides need borders
             left = pygame.Vector2(body_segment.x-1, body_segment.y)
             right = pygame.Vector2(body_segment.x+1, body_segment.y)
             up = pygame.Vector2(body_segment.x, body_segment.y-1)
             down = pygame.Vector2(body_segment.x, body_segment.y+1)
 
-            # Draw black border around the snake body
+            # Draw black border around the snake body, different edges
+            # for each block. Check the neighbor of each body segment to
+            # decide which sides need borders
             if left not in self.body:
                 pygame.draw.line(screen, (0, 0, 0),
                                  body_rect.topleft, body_rect.bottomleft, 2)
@@ -284,41 +284,51 @@ def main_menu():
 
 def start_game():
     """The actual game loop. Handles all snake game logic."""
-    food = Food()
-    main_game = Main()
+    main_game = Main()  # Create the snake and food
     # Trigger screen update event every 150ms
     UPDATE_SCREEN = pygame.USEREVENT
     pygame.time.set_timer(UPDATE_SCREEN, 150)
     play_game_music()
-    running = True
+    running = True  # Game state
+    # Whether or not the snake has already moved this tick
+    is_snake_movable = True
+
     while running:
-        # Clear screen at beginning of the frame with white
+        # Clear screen with white at beginning of the frame
         screen.fill((250, 250, 250))
         draw_text('welcome to the game', font, (5, 15, 10),
                   screen, SCREEN_WIDTH//2, 100)
+
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
-            if event.type == KEYDOWN:
+            elif event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
                     # Switch back to main menu music
                     play_main_menu_music()
                     running = False
-                if event.key == K_UP and main_game.snake.direction != (0, 1):
-                    main_game.snake.direction = (0, -1)
-                if event.key == K_DOWN and main_game.snake != (0, -1):
-                    main_game.snake.direction = (0, 1)
-                if event.key == K_LEFT and main_game.snake != (1, 0):
-                    main_game.snake.direction = (-1, 0)
-                if event.key == K_RIGHT and main_game.snake != (-1, 0):
-                    main_game.snake.direction = (1, 0)
-            if event.type == UPDATE_SCREEN:
+                # Ensure that the snake can only move one direction a frame
+                elif is_snake_movable == True:
+                    if event.key == K_UP and main_game.snake.direction != Vector2(0, 1):
+                        main_game.snake.direction = Vector2(0, -1)
+                        is_snake_movable = False
+                    elif event.key == K_DOWN and main_game.snake.direction != Vector2(0, -1):
+                        main_game.snake.direction = Vector2(0, 1)
+                        is_snake_movable = False
+                    elif event.key == K_LEFT and main_game.snake.direction != Vector2(1, 0):
+                        main_game.snake.direction = Vector2(-1, 0)
+                        is_snake_movable = False
+                    elif event.key == K_RIGHT and main_game.snake.direction != Vector2(-1, 0):
+                        main_game.snake.direction = Vector2(1, 0)
+                        is_snake_movable = False
+            elif event.type == UPDATE_SCREEN:
                 main_game.update()
+                is_snake_movable = True  # After the screen is updated, the snake can move again
 
-            main_game.draw_elements()
-            pygame.display.update()
-            main_clock.tick(60)
+        main_game.draw_elements()
+        pygame.display.update()
+        main_clock.tick(60)
 
 
 def start_sim():
