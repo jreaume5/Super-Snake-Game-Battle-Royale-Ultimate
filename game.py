@@ -122,43 +122,20 @@ font = pygame.font.SysFont(None, 100)
 click = False  # Boolean flag for click events
 
 
-def play_main_menu_music():
-    """Plays the main menu music"""
+
+def play_music(music):
     pygame.mixer.music.stop()
-    pygame.mixer.music.load('./music/main_menu_music.wav')
+    match music:
+        case "main_menu":
+            pygame.mixer.music.load('./music/main_menu_music.wav')
+        case "game":
+            pygame.mixer.music.load('./music/game_music.wav')
+        case "sim":
+            pygame.mixer.music.load('./music/sim_music.wav')
+        case _:
+            return  # Unknown music type, do nothing
     pygame.mixer.music.play(-1)
-
-
-def play_game_music():
-    """Plays the game music"""
-    pygame.mixer.music.stop()
-    pygame.mixer.music.load('./music/game_music.wav')
-    pygame.mixer.music.play(-1)
-
-
-def play_sim_music():
-    """Plays the simulation music"""
-    pygame.mixer.music.stop()
-    pygame.mixer.music.load('./music/sim_music.wav')
-    pygame.mixer.music.play(-1)
-
-
-def play_main_menu_music():
-    pygame.mixer.music.stop()
-    pygame.mixer.music.load('./music/main_menu_music.wav')
-    pygame.mixer.music.play(-1)
-
-
-def play_game_music():
-    pygame.mixer.music.stop()
-    pygame.mixer.music.load('./music/game_music.wav')
-    pygame.mixer.music.play(-1)
-
-
-def play_sim_music():
-    pygame.mixer.music.stop()
-    pygame.mixer.music.load('./music/sim_music.wav')
-    pygame.mixer.music.play(-1)
+    
 
 
 def draw_button(surface, button, text, font, bg_color, text_color):
@@ -217,7 +194,7 @@ def draw_text(text, font, color, surface, x, y, center=True):
 def main_menu():
     """The menu game loop. Handles all main menu logic."""
     # Start menu music
-    play_main_menu_music()
+    play_music("main_menu")
     while True:
         screen.fill((250, 250, 250))
         draw_text('main menu', font,
@@ -292,7 +269,7 @@ def start_game():
     # Trigger screen update event every 150ms
     UPDATE_SCREEN = pygame.USEREVENT
     pygame.time.set_timer(UPDATE_SCREEN, 150)
-    play_game_music()
+    play_music("game")
     running = True  # Game state
     # Whether or not the snake has already moved this tick
     is_snake_movable = True
@@ -310,7 +287,7 @@ def start_game():
             elif event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
                     # Switch back to main menu music
-                    play_main_menu_music()
+                    play_music("main_menu")
                     running = False
                 # Ensure that the snake can only move one direction a frame
                 elif is_snake_movable == True:
@@ -337,7 +314,7 @@ def start_game():
 
 def start_sim():
     """The simulation game loop. Handles all simulation logic."""
-    play_sim_music()
+    play_music("sim")
     running = True
     while running:
         # Clear screen at beginning of the frame with white
@@ -351,7 +328,7 @@ def start_sim():
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
                     # Switch back to main menu music
-                    play_main_menu_music()
+                    play_music("main_menu")
                     running = False
         pygame.display.update()
         main_clock.tick(60)
