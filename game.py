@@ -426,53 +426,75 @@ def start_sim():
 def settings():
     """The settings game loop. Handles all settings logic."""
     running = True
+    dragging = False
+
+    slider_rect = pygame.Rect(
+        SCREEN_WIDTH//1.75, 250, 200, 10)  # Volume slider track
+    # Calculate the x coordinate of the volume slider handle (default
+    #  set at 100%)
+    handle_x = SCREEN_WIDTH//1.75 + slider_rect.width
+    handle_rect = pygame.Rect(handle_x, 245, 10, 20)  # Volume slider handle
+
     while running:
-        # Clear screen at beginning of the frame with white
-        screen.fill((250, 250, 250))
-        draw_text('Settings', font, (5, 15, 10), screen, SCREEN_WIDTH//2, 100)
-
-        setting_label = pygame.font.SysFont(None, 75)
-
-        draw_text('Volume', setting_label, (5, 15, 10),
-                  screen, SCREEN_WIDTH//2.5, 250)
-        slider_rect = pygame.Rect(
-            SCREEN_WIDTH//1.75, 250, 200, 10)  # Slider track
-        # Calculate the x coordinate of the slider handle (default
-        # volume set at 100%)
-        handle_x = SCREEN_WIDTH//1.75 + slider_rect.width
-        handle_rect = pygame.Rect(handle_x, 245, 10, 20)  # Slider handle
-
-        pygame.draw.rect(screen, (100, 100, 100), slider_rect)  # Draw track
-        pygame.draw.rect(screen, (200, 200, 200), handle_rect)  # Draw handle
-
-        dragging = False
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
+            # Exiting settings menu logic
             if event.type == KEYDOWN:
                 if event.key == K_ESCAPE:
                     running = False
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if handle_rect.collidepoint(event.pos):
-                    dragging = True
-            elif event.type == pygame.MOUSEBUTTONUP:
-                dragging = False
-            elif event.type == pygame.MOUSEMOTION and dragging:
+            # Dragging slider handle through slider track
+            if event.type == pygame.MOUSEMOTION and dragging:
                 # Constrain handle movement within slider_rect
                 handle_rect.x = max(slider_rect.left, min(
                     event.pos[0], slider_rect.right - handle_rect.width))
+            # Clicking to set volume or drag slider
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if handle_rect.collidepoint(event.pos):
+                    dragging = True
+                if slider_rect.collidepoint(event.pos):
+                    handle_rect.x = max(slider_rect.left, min(
+                        event.pos[0], slider_rect.right - handle_rect.width))
+                if back_button.collidepoint(event.pos):
+                    running = False
+            # Resetting drag boolean when mouse button released
+            elif event.type == pygame.MOUSEBUTTONUP:
+                dragging = False
 
-        volume = (handle_rect.centerx - slider_rect.left) / \
-            slider_rect.width
-        pygame.mixer.music.set_volume(volume)
+            # Calculate volume from slider track and slider handle positions
+            volume = (handle_rect.centerx - slider_rect.left) / \
+                slider_rect.width
 
-        pygame.display.update()
+            # Hacky fix for volume but it works
+            if volume >= 0.975:
+                volume = 1
+            elif volume <= 0.025:
+                volume = 0
+
+            # Set the volume
+            pygame.mixer.music.set_volume(volume)
+
+        # Clear screen at beginning of the frame with white
+        screen.fill((250, 250, 250))
+
+        draw_text('Settings', font, (5, 15, 10), screen, SCREEN_WIDTH//2, 100)
+
+        back_button = pygame.Rect(
+            10, 57.5, 200, 75)
+
+        setting_label = pygame.font.SysFont(None, 75)
+
+        draw_button(screen, back_button, "Back", setting_label,
+                    (205, 220, 190), (0, 0, 0))
+        draw_text('Volume', setting_label, (5, 15, 10),
+                  screen, SCREEN_WIDTH//2.5, 250)
+
+        pygame.draw.rect(screen, (100, 100, 100), slider_rect)  # Slider track
+        pygame.draw.rect(screen, (200, 200, 200), handle_rect)  # Slider handle
+
+        pygame.display.flip()
         main_clock.tick(60)
-
-
-def game_over():
-    None  # Unimplemented
 
 
 main_menu()
