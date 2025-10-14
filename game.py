@@ -1,111 +1,11 @@
 from pygame.locals import *
 from pygame.math import Vector2
+from abc import ABC, abstractmethod
 import pygame
 import sys
 import random
 
-
-class Main:
-    def __init__(self):
-        self.snake = Snake()
-        self.food = Food()
-        self.food.set_random_pos(self.snake.body)
-
-    def update(self):
-        self.snake.move()
-        self.check_collisions()
-
-    def draw_elements(self):
-        self.food.draw()
-        self.snake.draw()
-
-    def check_collisions(self):
-        # Check if the head of the snake hits a screen border
-        head = self.snake.body[0]
-        if not 0 <= head.x < num_cells or not 0 <= head.y < num_cells:
-            self.game_over()
-
-        # Check if the snake ate food and draw new food
-        if self.snake.body[0] == self.food.pos:
-            self.snake.grow()
-            self.food.set_random_pos(self.snake.body)
-
-        # Check if the head of the snake hits itself
-        for body_segment in self.snake.body[1:]:
-            if head == body_segment:
-                self.game_over()
-
-    def game_over(self):
-        pygame.quit()
-        sys.exit()
-
-
-class Food:
-    def draw(self):
-        food_rect = pygame.Rect(int(self.pos.x * cell_size),
-                                int(self.pos.y * cell_size), cell_size, cell_size)
-        pygame.draw.rect(screen, (227, 255, 69), food_rect)
-
-    def set_random_pos(self, snake_body):
-        respawn = True
-        while True:
-            self.x = random.randint(0, num_cells - 1)
-            self.y = random.randint(0, num_cells - 1)
-            self.pos = pygame.math.Vector2(self.x, self.y)
-
-            # Check to make sure the food doesn't spawn inside the snake body
-            if self.pos not in snake_body:
-                return
-
-
-class Snake:
-    def __init__(self):
-        self.body = [pygame.Vector2(6, 10), Vector2(5, 10), Vector2(4, 10)]
-        self.length = len(self.body)
-        self.direction = Vector2(1, 0)  # Snake moves to the right by default
-
-    def draw(self):
-        for body_segment in self.body:
-            x = int(body_segment.x * cell_size)
-            y = int(body_segment.y * cell_size)
-
-            # Draw snake body with outside border
-            body_rect = pygame.Rect(x, y, cell_size, cell_size)
-            pygame.draw.rect(screen, (3, 252, 86), body_rect)
-
-            left = pygame.Vector2(body_segment.x-1, body_segment.y)
-            right = pygame.Vector2(body_segment.x+1, body_segment.y)
-            up = pygame.Vector2(body_segment.x, body_segment.y-1)
-            down = pygame.Vector2(body_segment.x, body_segment.y+1)
-
-            # Draw black border around the snake body, different edges
-            # for each block. Check the neighbor of each body segment to
-            # decide which sides need borders
-            if left not in self.body:
-                pygame.draw.line(screen, (0, 0, 0),
-                                 body_rect.topleft, body_rect.bottomleft, 2)
-            if right not in self.body:
-                pygame.draw.line(screen, (0, 0, 0),
-                                 body_rect.topright, body_rect.bottomright, 2)
-            if up not in self.body:
-                pygame.draw.line(screen, (0, 0, 0),
-                                 body_rect.topleft, body_rect.topright, 2)
-            if down not in self.body:
-                pygame.draw.line(screen, (0, 0, 0),
-                                 body_rect.bottomleft, body_rect.bottomright, 2)
-
-    def move(self):
-        # Copy all body segments except for the last
-        body_copy = self.body[:-1]
-        # Move the head forward
-        body_copy.insert(0, body_copy[0] + self.direction)
-        self.body = body_copy[:]  # Update the coordinates of the actual snake
-
-    def grow(self):
-        self.body.append(self.body[-1])
-        self.length += 1
-
-
+# Public variables
 main_clock = pygame.time.Clock()
 pygame.init()
 pygame.display.set_caption('Super Snake Battle Royale Ultimate')
@@ -122,8 +22,198 @@ font = pygame.font.SysFont(None, 100)
 click = False  # Boolean flag for click events
 
 
+class Main:
+    """TODO: Write documentation"""
+
+    def __init__(self):
+        self.snake = Snake()
+        self.food = Food()
+        self.food.set_random_pos(self.snake.body)
+        self.food_spawner = FoodSpawner()
+
+    def update(self):
+        """TODO: Write documentation"""
+        self.snake.move()
+        self.check_collisions()
+
+    def draw_elements(self):
+        """TODO: Write documentation"""
+        self.food.draw()
+        self.snake.draw()
+
+    def check_collisions(self):
+        """TODO: Write documentation"""
+        # Check if the head of the snake hits a screen border
+        head = self.snake.body[0]
+        if not 0 <= head.x < num_cells or not 0 <= head.y < num_cells:
+            self.game_over()
+
+        # Check if the snake ate food and draw new food
+        if self.snake.body[0] == self.food.pos:
+            self.food.effect(self.snake)
+            self.food.set_random_pos(self.snake.body)
+
+        # Check if the head of the snake hits itself
+        for body_segment in self.snake.body[1:]:
+            if head == body_segment:
+                self.game_over()
+
+    def game_over(self):
+        """TODO: Write documentation"""
+        pygame.quit()
+        sys.exit()
+
+
+class PowerUp(ABC):
+    """Abstract base class to provide structure and behavior of
+    CollectibleItems."""
+    power: str = "Default"  # Default PowerUp name
+    duration_s: float = 0.0  # Default duration of PowerUp in seconds
+    rarity: float = 0.0  # Default PowerUp rarity
+    growth: int = 1  # Default PowerUp growth
+    active: bool = False  # PowerUp effect(s) is/are not active by default
+    color: tuple = (227, 255, 69)  # Default PowerUp color
+    pos: Vector2 = (0, 0)  # Default PowerUp coordinates
+
+    def __init__(self):
+        None
+
+    @abstractmethod
+    def draw(self):
+        """TODO: Write documentation"""
+        pass
+
+    @abstractmethod
+    def set_random_pos(self):
+        """TODO: Write documentation"""
+        pass
+
+    @abstractmethod
+    def effect(self, snake):
+        """TODO: Write Documentation"""
+        pass
+
+
+class CollectibleItem(PowerUp):
+    """TODO: Write documentation"""
+
+    def __init__(self):
+        None
+
+    def draw(self):
+        """TODO: Write documentation"""
+        None
+
+    def set_random_pos(self):
+        None
+
+
+class Food(CollectibleItem):
+    """TODO: Write documentation"""
+
+    def draw(self):
+        """TODO: Write documentation"""
+        food_rect = pygame.Rect(int(self.pos.x * cell_size),
+                                int(self.pos.y * cell_size), cell_size, cell_size)
+        pygame.draw.rect(screen, self.color, food_rect)
+
+    def set_random_pos(self, snake_body):
+        """TODO: Write documentation"""
+        while True:
+            self.x = random.randint(0, num_cells - 1)
+            self.y = random.randint(0, num_cells - 1)
+            self.pos = pygame.math.Vector2(self.x, self.y)
+
+            # Check to make sure the food doesn't spawn inside the snake body
+            if self.pos not in snake_body:
+                return
+
+    def effect(self, snake):
+        """TODO: Write documentation"""
+        Snake.grow(snake)
+
+
+class FoodSpawner():
+    """TODO: CURRENTLY UNIMPLEMENTED (needs documentation)
+        This class will be used to handle the spawning and management of
+        Food/PowerUps.
+    """
+
+    def __init__(self):
+        """TODO: Write documentation"""
+        self.powerups = []  # list of active PowerUp instances
+
+
+class Snake:
+    """TODO: Write documentation"""
+
+    def __init__(self):
+        self.body = [pygame.Vector2(6, 10), Vector2(5, 10), Vector2(4, 10)]
+        self.length = len(self.body)
+        self.direction = Vector2(1, 0)  # Snake moves to the right by default
+        self.pending_growth = 0  # Number of queued growths remaining
+
+    def draw(self):
+        """TODO: Write documentation"""
+        for body_segment in self.body:
+            x = int(body_segment.x * cell_size)
+            y = int(body_segment.y * cell_size)
+
+            # Draw snake body with outside border
+            body_rect = pygame.Rect(x, y, cell_size, cell_size)
+            body_color = (3, 252, 86)
+            pygame.draw.rect(screen, body_color, body_rect)
+
+            left = pygame.Vector2(body_segment.x-1, body_segment.y)
+            right = pygame.Vector2(body_segment.x+1, body_segment.y)
+            up = pygame.Vector2(body_segment.x, body_segment.y-1)
+            down = pygame.Vector2(body_segment.x, body_segment.y+1)
+            border_color = (0, 0, 0)
+
+            # Draw black border around the snake body, different edges
+            # for each block. Check the neighbor of each body segment to
+            # decide which sides need borders
+            if left not in self.body:
+                pygame.draw.line(screen, border_color,
+                                 body_rect.topleft, body_rect.bottomleft, 2)
+            if right not in self.body:
+                pygame.draw.line(screen, border_color,
+                                 body_rect.topright, body_rect.bottomright, 2)
+            if up not in self.body:
+                pygame.draw.line(screen, border_color,
+                                 body_rect.topleft, body_rect.topright, 2)
+            if down not in self.body:
+                pygame.draw.line(screen, border_color,
+                                 body_rect.bottomleft, body_rect.bottomright, 2)
+
+    def move(self):
+        """TODO: Write documentation"""
+        new_head = self.body[0] + \
+            self.direction  # Calculate the cooridnates of the new head
+        self.body.insert(0, new_head)  # Move the head forward
+
+        # If the snake doesn't have any extra growth queued, update the
+        # tail, otherwise
+        if self.pending_growth > 0:
+            self.pending_growth -= 1
+        else:
+            self.body.pop()
+
+        # # Copy all body segments except for the last
+        # body_copy = self.body[:-1]
+        # # Move the head forward
+        # body_copy.insert(0, body_copy[0] + self.direction)
+        # # Update the coordinates of the actual snake
+        # self.body = body_copy[:]
+
+    def grow(self, num_growths=1):
+        """TODO: Write documentation"""
+        self.pending_growth += num_growths
+        self.length += num_growths
+
 
 def play_music(music):
+    """TODO: Write documentation"""
     pygame.mixer.music.stop()
     match music:
         case "main_menu":
@@ -135,7 +225,6 @@ def play_music(music):
         case _:
             return  # Unknown music type, do nothing
     pygame.mixer.music.play(-1)
-    
 
 
 def draw_button(surface, button, text, font, bg_color, text_color):
