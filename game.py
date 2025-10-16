@@ -5,21 +5,49 @@ import pygame
 import sys
 import random
 
-# Public variables
-main_clock = pygame.time.Clock()
+game_clock = pygame.time.Clock()
 pygame.init()
 pygame.display.set_caption('Super Snake Battle Royale Ultimate')
-# Credit for music goes to Newgrounds user ZaneLittle: https://www.newgrounds.com/audio/listen/1475739
 cell_size = 40
 num_cells = 20
-screen = pygame.display.set_mode(
-    (num_cells * cell_size, num_cells * cell_size))
+GRID_SIZE = (num_cells * cell_size, num_cells * cell_size)
 
-# screen = pygame.display.set_mode((0, 0))
+WINDOWED_MODE = "windowed"
+BORDERLESS_MODE = "borderless"
+FULLSCREEN_MODE = "fullscreen"
+current_display_mode = WINDOWED_MODE
+UPDATE_SCREEN = pygame.USEREVENT  # Global screen update event
+
+
+def set_mode(mode):
+    """TODO: Write documentation"""
+    global screen, current_display_mode
+    # The flags argument controls which type of display the window
+    # should use. Multiple types can be combined using the bitwise or
+    # operator (pipe "|" character).
+    # https://www.pygame.org/docs/ref/display.html#pygame.display.set_mode
+    flags = 0
+
+    size = GRID_SIZE
+
+    # Set the flags for each display mode
+    if mode == WINDOWED_MODE:
+        flags = pygame.RESIZABLE | pygame.SCALED
+    elif mode == BORDERLESS_MODE:
+        flags = pygame.NOFRAME | pygame.SCALED
+    elif mode == FULLSCREEN_MODE:
+        flags = pygame.FULLSCREEN
+
+    screen = pygame.display.set_mode(GRID_SIZE, flags)
+    curren_display_mode = mode
+    return screen
+
+
+screen = set_mode(WINDOWED_MODE)
 SCREEN_WIDTH, SCREEN_HEIGHT = screen.get_width(), screen.get_height()
 
 font = pygame.font.SysFont(None, 100)
-click = False  # Boolean flag for click events
+font2 = pygame.font.SysFont(None, 50)
 
 
 class Main:
@@ -28,7 +56,6 @@ class Main:
     def __init__(self):
         self.snake = Snake()
         self.food = Food()
-        self.food.set_random_pos(self.snake.body)
         self.food_spawner = FoodSpawner()
 
     def update(self):
@@ -38,7 +65,8 @@ class Main:
 
     def draw_elements(self):
         """TODO: Write documentation"""
-        self.food.draw()
+        if self.food.is_spawned:
+            self.food.draw()
         self.snake.draw()
 
     def check_collisions(self):
@@ -60,8 +88,7 @@ class Main:
 
     def game_over(self):
         """TODO: Write documentation"""
-        pygame.quit()
-        sys.exit()
+        self.snake.is_dead = True
 
 
 class PowerUp(ABC):
@@ -74,6 +101,7 @@ class PowerUp(ABC):
     active: bool = False  # PowerUp effect(s) is/are not active by default
     color: tuple = (227, 255, 69)  # Default PowerUp color
     pos: Vector2 = (0, 0)  # Default PowerUp coordinates
+    is_spawned: bool = False  # PowerUps are not spawned by default
 
     def __init__(self):
         None
@@ -102,20 +130,9 @@ class CollectibleItem(PowerUp):
 
     def draw(self):
         """TODO: Write documentation"""
-        None
-
-    def set_random_pos(self):
-        None
-
-
-class Food(CollectibleItem):
-    """TODO: Write documentation"""
-
-    def draw(self):
-        """TODO: Write documentation"""
-        food_rect = pygame.Rect(int(self.pos.x * cell_size),
-                                int(self.pos.y * cell_size), cell_size, cell_size)
-        pygame.draw.rect(screen, self.color, food_rect)
+        collectible_rect = pygame.Rect(int(self.pos.x * cell_size),
+                                       int(self.pos.y * cell_size), cell_size, cell_size)
+        pygame.draw.rect(screen, self.color, collectible_rect)
 
     def set_random_pos(self, snake_body):
         """TODO: Write documentation"""
@@ -127,6 +144,10 @@ class Food(CollectibleItem):
             # Check to make sure the food doesn't spawn inside the snake body
             if self.pos not in snake_body:
                 return
+
+
+class Food(CollectibleItem):
+    """TODO: Write documentation"""
 
     def effect(self, snake):
         """TODO: Write documentation"""
@@ -152,6 +173,7 @@ class Snake:
         self.length = len(self.body)
         self.direction = Vector2(1, 0)  # Snake moves to the right by default
         self.pending_growth = 0  # Number of queued growths remaining
+        self.is_dead = False
 
     def draw(self):
         """TODO: Write documentation"""
@@ -213,7 +235,7 @@ class Snake:
 
 
 def play_music(music):
-    """TODO: Write documentation"""
+    """Credit for music goes to Newgrounds user ZaneLittle: https://www.newgrounds.com/audio/listen/1475739"""
     pygame.mixer.music.stop()
     match music:
         case "main_menu":
@@ -222,6 +244,10 @@ def play_music(music):
             pygame.mixer.music.load('./music/game_music.wav')
         case "sim":
             pygame.mixer.music.load('./music/sim_music.wav')
+        case "game_over":
+            pygame.mixer.music.load('./music/game_over_music.wav')
+        case "pause_menu":
+            pygame.mixer.music.load('./music/pause_menu_music.wav')
         case _:
             return  # Unknown music type, do nothing
     pygame.mixer.music.play(-1)
@@ -243,15 +269,21 @@ def draw_button(surface, button, text, font, bg_color, text_color):
         None
     """
 
+    transparent_surface = pygame.Surface(
+        (button.width, button.height), pygame.SRCALPHA)
+
     # Draw button background
-    pygame.draw.rect(surface, bg_color, button)
+    pygame.draw.rect(transparent_surface, bg_color,
+                     transparent_surface.get_rect())
 
     # Render the text
     text_surface = font.render(text, True, text_color)
-    text_rect = text_surface.get_rect(center=button.center)
+    text_rect = text_surface.get_rect(
+        center=(button.width//2, button.height//2))
+    transparent_surface.blit(text_surface, text_rect)
 
     # BLIT text centered in the button
-    surface.blit(text_surface, text_rect)
+    surface.blit(transparent_surface, button.topleft)
 
 
 def draw_text(text, font, color, surface, x, y, center=True):
@@ -284,6 +316,8 @@ def main_menu():
     """The menu game loop. Handles all main menu logic."""
     # Start menu music
     play_music("main_menu")
+    click = False
+
     while True:
         screen.fill((250, 250, 250))
         draw_text('main menu', font,
@@ -349,56 +383,126 @@ def main_menu():
                 if event.button == 1:
                     click = True
         pygame.display.update()
-        main_clock.tick(60)
+        game_clock.tick(60)
 
 
 def start_game():
     """The actual game loop. Handles all snake game logic."""
-    main_game = Main()  # Create the snake and food
+    game = Main()  # Create the snake and food
+    food = game.food
+    snake = game.snake
     # Trigger screen update event every 150ms
-    UPDATE_SCREEN = pygame.USEREVENT
     pygame.time.set_timer(UPDATE_SCREEN, 150)
-    play_music("game")
-    running = True  # Game state
+
+    pygame.mixer.music.stop()  # Stop playing the menu music
+
     # Whether or not the snake has already moved this tick
     is_snake_movable = True
+    game_not_started = True
+    ignore_next_keydown = False
 
-    while running:
+    while True:
         # Clear screen with white at beginning of the frame
         screen.fill((250, 250, 250))
-        draw_text('welcome to the game', font, (5, 15, 10),
-                  screen, SCREEN_WIDTH//2, 100)
+
+        if game_not_started:
+            draw_text('welcome to the game', font, (5, 15, 10),
+                      screen, SCREEN_WIDTH//2, 100)
+            draw_text('press any key to start', font, (5, 15, 10),
+                      screen, SCREEN_WIDTH//2, 175)
+            game.draw_elements()
 
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
+
             elif event.type == KEYDOWN:
+                # Ignore the first keypress after pause to prevent
+                # instant movement
+                if ignore_next_keydown:
+                    ignore_next_keydown = False
+                    continue
+
+                if game_not_started:
+                    if not food.is_spawned:
+                        food.set_random_pos(snake.body)
+                        food.is_spawned = True
+                    game_not_started = not game_not_started
+                    play_music("game")
+                    continue
+
                 if event.key == K_ESCAPE:
-                    # Switch back to main menu music
-                    play_music("main_menu")
-                    running = False
+                    pygame.time.set_timer(UPDATE_SCREEN, 0)
+                    pause_menu(game)
+                    pygame.event.clear(pygame.KEYDOWN)
+                    ignore_next_keydown = True
+                    pygame.time.set_timer(UPDATE_SCREEN, 150)
+                    continue
+
                 # Ensure that the snake can only move one direction a frame
                 elif is_snake_movable == True:
-                    if event.key == K_UP and main_game.snake.direction != Vector2(0, 1):
-                        main_game.snake.direction = Vector2(0, -1)
+                    if event.key == K_UP and snake.direction != Vector2(0, 1):
+                        game.snake.direction = Vector2(0, -1)
                         is_snake_movable = False
-                    elif event.key == K_DOWN and main_game.snake.direction != Vector2(0, -1):
-                        main_game.snake.direction = Vector2(0, 1)
+                    elif event.key == K_DOWN and snake.direction != Vector2(0, -1):
+                        snake.direction = Vector2(0, 1)
                         is_snake_movable = False
-                    elif event.key == K_LEFT and main_game.snake.direction != Vector2(1, 0):
-                        main_game.snake.direction = Vector2(-1, 0)
+                    elif event.key == K_LEFT and snake.direction != Vector2(1, 0):
+                        snake.direction = Vector2(-1, 0)
                         is_snake_movable = False
-                    elif event.key == K_RIGHT and main_game.snake.direction != Vector2(-1, 0):
-                        main_game.snake.direction = Vector2(1, 0)
+                    elif event.key == K_RIGHT and snake.direction != Vector2(-1, 0):
+                        snake.direction = Vector2(1, 0)
                         is_snake_movable = False
-            elif event.type == UPDATE_SCREEN:
-                main_game.update()
-                is_snake_movable = True  # After the screen is updated, the snake can move again
 
-        main_game.draw_elements()
+            elif event.type == UPDATE_SCREEN:
+                if not game_not_started:
+                    game.update()
+                    is_snake_movable = True  # After the screen is updated, the snake can move again
+
+        game.draw_elements()
         pygame.display.update()
-        main_clock.tick(60)
+        game_clock.tick(60)
+
+        # Check if the game is over (snake collided/died)
+        if snake.is_dead:
+            continue_playing = game_over()
+            if continue_playing:
+                game = Main()
+                food = game.food
+                snake = game.snake
+                game_not_started = True
+                is_snake_movable = True
+                pygame.event.clear(pygame.KEYDOWN)
+                continue
+            return "Main Menu"
+
+
+def game_over():
+    """TODO: Write documentation"""
+    play_music("game_over")
+    screen.fill((255, 255, 255))  # Clear the screen with white
+    draw_text('game over :c', font, (5, 15, 10),
+              screen, SCREEN_WIDTH//2, 100)
+    draw_text('press space or enter to play again', font2, (5, 15, 10),
+              screen, SCREEN_WIDTH//2, 300)
+    draw_text('press escape or backspace to quit', font2, (5, 15, 10),
+              screen, SCREEN_WIDTH//2, 350)
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == KEYDOWN:
+                if event.key in (K_ESCAPE, K_BACKSPACE):
+                    play_music("main_menu")
+                    return False
+                elif event.key in (K_SPACE, K_RETURN):
+                    pygame.mixer.music.stop()
+                    return True
+            pygame.display.update()
+            game_clock.tick(60)
 
 
 def start_sim():
@@ -420,7 +524,105 @@ def start_sim():
                     play_music("main_menu")
                     running = False
         pygame.display.update()
-        main_clock.tick(60)
+        game_clock.tick(60)
+
+
+def pause_menu(game):
+    """TODO: Write documentation"""
+    # Freeze all game updates and lower the music volume
+    prev_volume = pygame.mixer.music.get_volume()
+    pygame.time.set_timer(UPDATE_SCREEN, 0)
+    music_volume = pygame.mixer.music.get_volume()
+    pygame.mixer.music.set_volume(0.3)
+
+    # Create menu buttons
+    pause_labels = ["back", "settings", "quit"]
+    num_buttons = len(pause_labels)
+    pause_buttons = []
+    pause_button_color = (205, 220, 190, 20)
+    pause_button_width, pause_button_height = 400, 75
+    pause_button_padding = 20  # Spacing between buttons
+
+    # Total height of all buttons including padding (amount of space
+    # taken up by the buttons in the window)
+    total_button_height = (pause_button_height * num_buttons) + \
+        pause_button_padding * (num_buttons - 1)
+
+    # Starting Y position for vertical centering of buttons
+    button_start_y = (SCREEN_HEIGHT - total_button_height) // 2
+
+    # Create a transparent overlay with a dim background that matches
+    # the screen dimensions
+    transparent_overlay = pygame.Surface(
+        (SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+
+    for i, label in enumerate(pause_labels):
+        pause_button = pygame.Rect(
+            0, 0, pause_button_width, pause_button_height)
+        pause_button.center = (SCREEN_WIDTH // 2, button_start_y +
+                               i * (pause_button_height + pause_button_padding))
+        pause_buttons.append((pause_button, label))
+
+    while True:
+        click = False
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == KEYDOWN:
+                if event.key in (K_ESCAPE, K_RETURN, K_p):
+                    pygame.mixer.music.set_volume(
+                        prev_volume)
+                    pygame.mixer.music.unpause()
+                    pygame.event.clear(KEYDOWN)
+                    pygame.event.pump
+                    pygame.time.set_timer(UPDATE_SCREEN, 150)
+                    return "resume game"
+            if event.type == MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    click = True
+
+        # Redraw last frozen game frame
+        screen.fill((250, 250, 250))
+        game.draw_elements()
+
+        # Dim overlay
+        transparent_overlay.fill((0, 0, 0, 150))
+        screen.blit(transparent_overlay, (0, 0))
+
+        draw_text('paused', font, (255, 255, 255),
+                  screen, SCREEN_WIDTH//2, 100)
+        draw_text("press escape, enter, or p to resume", font2, (255, 255, 255),
+                  screen, SCREEN_WIDTH//2, 175)
+
+        for button, label in pause_buttons:
+            bg = pause_button_color if not button.collidepoint(
+                (mouse_x, mouse_y)) else (255, 255, 255, 20)
+            draw_button(screen, button, label, font,
+                        bg, (255, 255, 255))
+
+            # Check if the user clicks a menu button
+            if button.collidepoint((mouse_x, mouse_y)) and click:
+                if label == "back":
+                    pygame.mixer.music.set_volume(prev_volume)
+                    pygame.mixer.music.unpause()
+                    # Clear current key press
+                    pygame.event.clear(KEYDOWN)
+                    # Fire an instant game update
+                    pygame.event.post(pygame.event.Event(UPDATE_SCREEN))
+                    pygame.time.set_timer(UPDATE_SCREEN, 150)
+                    return "resume game"
+                elif label == "settings":
+                    print("SETTINGS IN PAUSE MENU UNIMPLEMENTED")
+                    pass
+                elif label == "quit":
+                    pygame.mixer.music.set_volume(prev_volume)
+                    main_menu()
+
+        pygame.display.update()
+        game_clock.tick(60)
 
 
 def settings():
@@ -493,8 +695,8 @@ def settings():
         pygame.draw.rect(screen, (100, 100, 100), slider_rect)  # Slider track
         pygame.draw.rect(screen, (200, 200, 200), handle_rect)  # Slider handle
 
-        pygame.display.flip()
-        main_clock.tick(60)
+        pygame.display.update()
+        game_clock.tick(60)
 
 
 main_menu()
