@@ -54,20 +54,29 @@ class Main:
     """TODO: Write documentation"""
 
     def __init__(self):
-        self.snake = Snake()
-        self.food = Food()
-        self.food_spawner = FoodSpawner()
+        self.snakes = [
+            Snake(start_pos=Vector2(5,5), direction=(1, 0), color=(0, 200, 0), snake_id=0),
+            Snake(start_pos=Vector2(14, 14), direction=(-1, 0), color=(0, 0, 200), snake_id=1),
+            Snake(start_pos=Vector2(5, 14), direction=(0, -1), color=(200, 0, 0), snake_id=2),
+            Snake(start_pos=Vector2(14, 5), direction=(0, 1), color=(200, 0, 200), snake_id=3),
+        ]
+        #self.food = Food()
+        #self.food_spawner = FoodSpawner() #ignoring this for now cause we don't need food for now
 
     def update(self):
         """TODO: Write documentation"""
-        self.snake.move()
+        # move all alive snakes
+        for snake in self.snakes:
+            if not snake.is_dead:
+                snake.move()
+        # after everyone moves, resolve collisions
         self.check_collisions()
 
     def draw_elements(self):
         """TODO: Write documentation"""
-        if self.food.is_spawned:
-            self.food.draw()
-        self.snake.draw()
+        for snake in self.snakes:
+            if not snake.is_dead:
+                snake.draw()
 
     def check_collisions(self):
         """TODO: Write documentation"""
@@ -168,10 +177,19 @@ class FoodSpawner():
 class Snake:
     """TODO: Write documentation"""
 
-    def __init__(self):
-        self.body = [pygame.Vector2(6, 10), Vector2(5, 10), Vector2(4, 10)]
+    def __init__(self, start_pos, direction, color, snake_id):
+        # self.body = [pygame.Vector2(6, 10), Vector2(5, 10), Vector2(4, 10)]
+        self.direction = direction  # Snake moves to the right by default
+        self.color = color # r,g,b
+        self.id = snake_id # id for each agent snake (int or string)
+
+        # initial 3 blocks of body in a row
+        self.body = [
+            pygame.Vector2(start_pos.x, start_pos.y),
+            pygame.Vector2(start_pos.x - direction.x, start_pos.y - direction.y),
+            pygame.Vector2(start_pos.x - 2*direction.x, start_pos.y - 2*direction.y),
+        ]
         self.length = len(self.body)
-        self.direction = Vector2(1, 0)  # Snake moves to the right by default
         self.pending_growth = 0  # Number of queued growths remaining
         self.is_dead = False
 
@@ -183,8 +201,8 @@ class Snake:
 
             # Draw snake body with outside border
             body_rect = pygame.Rect(x, y, cell_size, cell_size)
-            body_color = (3, 252, 86)
-            pygame.draw.rect(screen, body_color, body_rect)
+            #body_color = (3, 252, 86)
+            pygame.draw.rect(screen, self.color, body_rect)
 
             left = pygame.Vector2(body_segment.x-1, body_segment.y)
             right = pygame.Vector2(body_segment.x+1, body_segment.y)
