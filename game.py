@@ -131,10 +131,6 @@ class Main:
         #     if head == body_segment:
         #         self.game_over()
 
-    def game_over(self):
-        """TODO: Write documentation"""
-        self.snake.is_dead = True
-
 
 class PowerUp(ABC):
     """Abstract base class to provide structure and behavior of
@@ -287,6 +283,22 @@ class Snake:
         self.pending_growth += num_growths
         self.length += num_growths
 
+def turn_left(vec: Vector2):
+    # rotate 90 degree left
+    return Vector2(-vec.y, vec.x)
+
+def turn_right(vec: Vector2):
+    # rotate 90 degree right
+    return Vector2(vec.y, -vec.x)
+
+def apply_action(snake, action):
+    # actions 0 = straight , 1 = left, 2 = right
+    if action == 0:
+        return
+    elif action == 1:
+        snake.direction = turn_left(snake.direction)
+    elif action == 2:
+        snake.direction = turn_right(snake.direction)
 
 def play_music(music):
     """Credit for music goes to Newgrounds user ZaneLittle: https://www.newgrounds.com/audio/listen/1475739"""
@@ -442,94 +454,56 @@ def main_menu():
 
 def start_game():
     """The actual game loop. Handles all snake game logic."""
-    game = Main()  # Create the snake and food
-    food = game.food
-    snake = game.snake
-    # Trigger screen update event every 150ms
-    pygame.time.set_timer(UPDATE_SCREEN, 150)
+    game = Main() # new round with multiple snakes 
+    pygame.time.set_timer(UPDATE_SCREEN, 300)
+    pygame.mixer.music.stop()
+    play_music("game")
 
-    pygame.mixer.music.stop()  # Stop playing the menu music
+    game_running = True
 
-    # Whether or not the snake has already moved this tick
-    is_snake_movable = True
-    game_not_started = True
-    ignore_next_keydown = False
+    while game_running:
+        screen.fill((250, 250, 250)) #clear the screen
 
-    while True:
-        # Clear screen with white at beginning of the frame
-        screen.fill((250, 250, 250))
-
-        if game_not_started:
-            draw_text('welcome to the game', font, (5, 15, 10),
-                      screen, SCREEN_WIDTH//2, 100)
-            draw_text('press any key to start', font, (5, 15, 10),
-                      screen, SCREEN_WIDTH//2, 175)
-            game.draw_elements()
-
+        #event pause and quit only
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
 
             elif event.type == KEYDOWN:
-                # Ignore the first keypress after pause to prevent
-                # instant movement
-                if ignore_next_keydown:
-                    ignore_next_keydown = False
-                    continue
-
-                if game_not_started:
-                    if not food.is_spawned:
-                        food.set_random_pos(snake.body)
-                        food.is_spawned = True
-                    game_not_started = not game_not_started
-                    play_music("game")
-                    continue
-
                 if event.key == K_ESCAPE:
+                    #pause menu
                     pygame.time.set_timer(UPDATE_SCREEN, 0)
                     pause_menu(game)
                     pygame.event.clear(pygame.KEYDOWN)
-                    ignore_next_keydown = True
                     pygame.time.set_timer(UPDATE_SCREEN, 150)
-                    continue
-
-                # Ensure that the snake can only move one direction a frame
-                elif is_snake_movable == True:
-                    if event.key == K_UP and snake.direction != Vector2(0, 1):
-                        game.snake.direction = Vector2(0, -1)
-                        is_snake_movable = False
-                    elif event.key == K_DOWN and snake.direction != Vector2(0, -1):
-                        snake.direction = Vector2(0, 1)
-                        is_snake_movable = False
-                    elif event.key == K_LEFT and snake.direction != Vector2(1, 0):
-                        snake.direction = Vector2(-1, 0)
-                        is_snake_movable = False
-                    elif event.key == K_RIGHT and snake.direction != Vector2(-1, 0):
-                        snake.direction = Vector2(1, 0)
-                        is_snake_movable = False
 
             elif event.type == UPDATE_SCREEN:
-                if not game_not_started:
-                    game.update()
-                    is_snake_movable = True  # After the screen is updated, the snake can move again
+                for s in game.snakes:
+                    if s.is_dead:
+                        continue
+                    action = random.randint(0, 2)
+                    apply_action(s, action)
+
+                game.update()
 
         game.draw_elements()
         pygame.display.update()
         game_clock.tick(60)
 
-        # Check if the game is over (snake collided/died)
-        if snake.is_dead:
+        alive_snakes = [s for s in game.snakes if not s.is_dead]
+        if len(alive_snakes) <= 1:
+            #round is over, show the game_over screen
             continue_playing = game_over()
             if continue_playing:
+                # restart the round fresh
                 game = Main()
-                food = game.food
-                snake = game.snake
-                game_not_started = True
-                is_snake_movable = True
                 pygame.event.clear(pygame.KEYDOWN)
+                play_music("game")
                 continue
-            return "Main Menu"
+            else:
+                # go back to main menu
+                return "Main Menu" 
 
 
 def game_over():
