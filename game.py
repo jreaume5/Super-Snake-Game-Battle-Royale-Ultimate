@@ -80,20 +80,56 @@ class Main:
 
     def check_collisions(self):
         """TODO: Write documentation"""
-        # Check if the head of the snake hits a screen border
-        head = self.snake.body[0]
-        if not 0 <= head.x < num_cells or not 0 <= head.y < num_cells:
-            self.game_over()
+        # Border and self collision 
+        for snake in self.snakes:
+            if snake.is_dead:
+                continue
 
-        # Check if the snake ate food and draw new food
-        if self.snake.body[0] == self.food.pos:
-            self.food.effect(self.snake)
-            self.food.set_random_pos(self.snake.body)
+            head = snake.body[0]
+            
+            # out of bounds 
+            if not (0 <= head.x < num_cells and 0 <= head.y < num_cells):
+                snake.is_dead = True
+                continue
 
-        # Check if the head of the snake hits itself
-        for body_segment in self.snake.body[1:]:
-            if head == body_segment:
-                self.game_over()
+            # bite their own body
+            if head in snake.body[1:]:
+                snake.is_dead = True
+                continue
+
+        # Now snake vs snake collision
+        # we gonna check each pair (attacker, victim)
+        for attacker in self.snakes:
+            if attacker.is_dead:
+                continue
+            attacker_head = attacker.body[0]
+
+            for victim in self.snakes:
+                if victim.is_dead:
+                    continue
+                if victim.id == attacker.id:
+                    continue #we just want to check if its not comparing with it self
+
+                #if attacker head hit any part fo victim 
+                if attacker_head in victim.body:
+                    #attacker eat victim
+                    victim.is_dead = True
+                    #rewad the attacke to grow by 3 squares
+                    attacker.grow(num_growths=3)
+        # # Check if the head of the snake hits a screen border
+        # head = self.snake.body[0]
+        # if not 0 <= head.x < num_cells or not 0 <= head.y < num_cells:
+        #     self.game_over()
+
+        # # Check if the snake ate food and draw new food
+        # if self.snake.body[0] == self.food.pos:
+        #     self.food.effect(self.snake)
+        #     self.food.set_random_pos(self.snake.body)
+
+        # # Check if the head of the snake hits itself
+        # for body_segment in self.snake.body[1:]:
+        #     if head == body_segment:
+        #         self.game_over()
 
     def game_over(self):
         """TODO: Write documentation"""
