@@ -55,10 +55,10 @@ class Main:
 
     def __init__(self):
         self.snakes = [
-            Snake(start_pos=Vector2(5,5), direction=(1, 0), color=(0, 200, 0), snake_id=0),
-            Snake(start_pos=Vector2(14, 14), direction=(-1, 0), color=(0, 0, 200), snake_id=1),
-            Snake(start_pos=Vector2(5, 14), direction=(0, -1), color=(200, 0, 0), snake_id=2),
-            Snake(start_pos=Vector2(14, 5), direction=(0, 1), color=(200, 0, 200), snake_id=3),
+            Snake(start_pos=Vector2(5,5), direction=Vector2(1, 0), color=(0, 200, 0), snake_id=0),
+            Snake(start_pos=Vector2(14, 14), direction=Vector2(-1, 0), color=(0, 0, 200), snake_id=1),
+            Snake(start_pos=Vector2(5, 14), direction=Vector2(0, -1), color=(200, 0, 0), snake_id=2),
+            Snake(start_pos=Vector2(14, 5), direction=Vector2(0, 1), color=(200, 0, 200), snake_id=3),
         ]
         #self.food = Food()
         #self.food_spawner = FoodSpawner() #ignoring this for now cause we don't need food for now
