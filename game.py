@@ -19,19 +19,20 @@ FULLSCREEN_MODE = "fullscreen"
 current_display_mode = WINDOWED_MODE
 UPDATE_SCREEN = pygame.USEREVENT  # Global screen update event
 
-######JACOB'S CHANGES#######
+###### JACOB'S CHANGES#######
 # --- Speed Boost constants---
-BASE_TICK_MS = 110 #default is 150, currently testing        # Your current update tick in start_game()
-BOOST_TICK_MS = 70 #default is 90 currently testing        # Faster tick while boost is active
+# default is 150, currently testing        # Your current update tick in start_game()
+BASE_TICK_MS = 110
+# default is 90 currently testing        # Faster tick while boost is active
+BOOST_TICK_MS = 70
 SPEED_BOOST_END = pygame.USEREVENT + 1  # one-shot event to end the boost
 
-###SHRINK CONSTANTS -JACOB-######
+### SHRINK CONSTANTS -JACOB-######
 # --- Idle Shrink constants ---
 SHRINK_START_MS = 8000          # time after last eat before shrinking starts
 SHRINK_RATE_MS_BASE = 2500      # base interval between shrinks once active
 SHRINK_RATE_MS_MIN = 900        # cap so it never becomes too fast
 SHRINK_FLASH_WARNING_MS = 1000  # start flashing this long before a shrink
-
 
 
 def set_mode(mode):
@@ -72,18 +73,21 @@ class Main:
         self.snake = Snake()
         self.food = Food()
         self.food_spawner = FoodSpawner()
-        #####JACOB'S CHANGES#####
-        self.speed_boost = SpeedBoost() 
-        #####SHRINK CHANGES#####
+        ##### JACOB'S CHANGES#####
+        self.speed_boost = SpeedBoost()
+        ##### SHRINK CHANGES#####
         # --- Idle Shrink state---
         self.last_eat_ms = pygame.time.get_ticks()  # reset when food eaten
-        self.next_shrink_due = None                 # when the next shrink happens; None until active
+        # when the next shrink happens; None until active
+        self.next_shrink_due = None
+        self.shrinking_border = ShrinkingBorder(num_cells, cell_size)
 
+    ### SHRINK CHANGES#####
 
-    ###SHRINK CHANGES#####
     def _current_shrink_rate_ms(self):
         """Shrink a bit faster as the snake gets longer (simple linear scaling)."""
-        extra = max(0, len(self.snake.body) - 3)   # don’t penalize the starting length
+        extra = max(0, len(self.snake.body) -
+                    3)   # don’t penalize the starting length
         rate = SHRINK_RATE_MS_BASE - extra * 150   # 150ms faster per extra segment
         return max(SHRINK_RATE_MS_MIN, rate)
 
@@ -94,21 +98,19 @@ class Main:
         # If enough time has passed without eating, start (or continue) shrinking
         idle_ms = now - self.last_eat_ms
         if idle_ms >= SHRINK_START_MS:
-        # schedule the first shrink if we haven't yet
+            # schedule the first shrink if we haven't yet
             if self.next_shrink_due is None:
                 self.next_shrink_due = now + self._current_shrink_rate_ms()
 
         # perform a shrink if we're past due
             if now >= self.next_shrink_due:
-            # remove one tail segment
+                # remove one tail segment
                 self.snake.shrink(1)
 
                 if not self.snake.is_dead:
-                # schedule the next shrink based on *current* length
+                    # schedule the next shrink based on *current* length
                     self.next_shrink_due = now + self._current_shrink_rate_ms()
             # if dead, the caller (update) will early-out this frame
-
-            self.shrinking_border = ShrinkingBorder(num_cells, cell_size)
 
     def update(self):
         """TODO: Write documentation"""
@@ -119,13 +121,12 @@ class Main:
         self.shrinking_border.update()
         self.check_collisions()
 
-
     def draw_elements(self):
         """TODO: Write documentation"""
         if self.food.is_spawned:
             self.food.draw()
         self.snake.draw()
-        #####JACOB'S CHANGES#####
+        ##### JACOB'S CHANGES#####
         # Draw speed boost if spawned (ADD-ONLY)
         if getattr(self.speed_boost, "is_spawned", False):
             self.speed_boost.draw()
@@ -153,7 +154,7 @@ class Main:
         if self.snake.body[0] == self.food.pos:
             self.food.effect(self.snake)
             self.food.set_random_pos(self.snake.body)
-            ####SHRINK CHANGES#####
+            #### SHRINK CHANGES#####
             self.last_eat_ms = pygame.time.get_ticks()
             self.next_shrink_due = None
 
@@ -161,22 +162,20 @@ class Main:
         for body_segment in self.snake.body[1:]:
             if head == body_segment:
                 self.game_over()
-                
-        #####JACOB'S CHANGES#####
+
+        ##### JACOB'S CHANGES#####
         # Check if the snake picked up a speed boost (ADD-ONLY)
         if getattr(self.speed_boost, "is_spawned", False) and self.snake.body[0] == self.speed_boost.pos:
             self.speed_boost.effect(self.snake)
-            
+
         # Occasionally spawn a speed boost if none is active on the field (ADD-ONLY)
         if not self.speed_boost.is_spawned and random.random() < 0.005:
-        # Ensure it doesn't spawn inside the snake or on top of food
+            # Ensure it doesn't spawn inside the snake or on top of food
             while True:
                 self.speed_boost.set_random_pos(self.snake.body)
                 if (not self.food.is_spawned) or (self.speed_boost.pos != self.food.pos):
                     break
             self.speed_boost.is_spawned = True
-
-
 
     def game_over(self):
         """TODO: Write documentation"""
@@ -472,7 +471,9 @@ class Food(CollectibleItem):
         """TODO: Write documentation"""
         Snake.grow(snake)
 
-#######JACOB'S CHANGES#######
+####### JACOB'S CHANGES#######
+
+
 class SpeedBoost(CollectibleItem):
     """A pickup that temporarily speeds up the game tick (snake moves faster)."""
     color = (255, 165, 0)   # orange block
@@ -785,13 +786,15 @@ def main_menu():
                 if event.button == 1:
                     click = True
         pygame.display.update()
-        game_clock.tick(120) # default value is 60 currently testing 
+        game_clock.tick(120)  # default value is 60 currently testing
 
 
 def reset_speed_boost_state(game):
     """Reset timers and despawn any existing speed boost."""
-    pygame.time.set_timer(SPEED_BOOST_END, 0)              # stop the one-shot end timer
-    pygame.time.set_timer(UPDATE_SCREEN, BASE_TICK_MS)     # restore normal speed
+    pygame.time.set_timer(
+        SPEED_BOOST_END, 0)              # stop the one-shot end timer
+    # restore normal speed
+    pygame.time.set_timer(UPDATE_SCREEN, BASE_TICK_MS)
     if hasattr(game, "speed_boost"):
         game.speed_boost.is_spawned = False
         game.speed_boost.pos = pygame.math.Vector2(-1, -1)
@@ -800,7 +803,7 @@ def reset_speed_boost_state(game):
 def start_game():
     """The actual game loop. Handles all snake game logic."""
     game = Main()  # Create the snake and food
-    
+
     reset_speed_boost_state(game)  # ensure no leftover boost/timers
 
     food = game.food
@@ -875,9 +878,9 @@ def start_game():
                     game.update()
                     is_snake_movable = True  # After the screen is updated, the snake can move again
 
-            #####JACOB'S CHANGES#####
+            ##### JACOB'S CHANGES#####
             elif event.type == SPEED_BOOST_END:
-    # Restore normal tick rate when boost expires (ADD-ONLY)
+                # Restore normal tick rate when boost expires (ADD-ONLY)
                 pygame.time.set_timer(UPDATE_SCREEN, BASE_TICK_MS)
 
         game.draw_elements()
@@ -889,9 +892,10 @@ def start_game():
             continue_playing = game_over()
             if continue_playing:
                 game = Main()
-                
-                reset_speed_boost_state(game)  # ensure no leftover boost/timers
-                
+
+                # ensure no leftover boost/timers
+                reset_speed_boost_state(game)
+
                 food = game.food
                 snake = game.snake
                 game_not_started = True
