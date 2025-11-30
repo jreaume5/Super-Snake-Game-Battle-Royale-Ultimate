@@ -1,3 +1,4 @@
+import time
 from pygame.locals import *
 from pygame.math import Vector2
 from abc import ABC, abstractmethod
@@ -17,6 +18,21 @@ BORDERLESS_MODE = "borderless"
 FULLSCREEN_MODE = "fullscreen"
 current_display_mode = WINDOWED_MODE
 UPDATE_SCREEN = pygame.USEREVENT  # Global screen update event
+
+###### JACOB'S CHANGES#######
+# --- Speed Boost constants---
+# default is 150, currently testing        # Your current update tick in start_game()
+BASE_TICK_MS = 110
+# default is 90 currently testing        # Faster tick while boost is active
+BOOST_TICK_MS = 70
+SPEED_BOOST_END = pygame.USEREVENT + 1  # one-shot event to end the boost
+
+### SHRINK CONSTANTS -JACOB-######
+# --- Idle Shrink constants ---
+SHRINK_START_MS = 8000          # time after last eat before shrinking starts
+SHRINK_RATE_MS_BASE = 2500      # base interval between shrinks once active
+SHRINK_RATE_MS_MIN = 900        # cap so it never becomes too fast
+SHRINK_FLASH_WARNING_MS = 1000  # start flashing this long before a shrink
 
 
 def set_mode(mode):
@@ -57,10 +73,52 @@ class Main:
         self.snake = Snake()
         self.food = Food()
         self.food_spawner = FoodSpawner()
+        ##### JACOB'S CHANGES#####
+        self.speed_boost = SpeedBoost()
+        ##### SHRINK CHANGES#####
+        # --- Idle Shrink state---
+        self.last_eat_ms = pygame.time.get_ticks()  # reset when food eaten
+        # when the next shrink happens; None until active
+        self.next_shrink_due = None
+        self.shrinking_border = ShrinkingBorder(num_cells, cell_size)
+
+    ### SHRINK CHANGES#####
+
+    def _current_shrink_rate_ms(self):
+        """Shrink a bit faster as the snake gets longer (simple linear scaling)."""
+        extra = max(0, len(self.snake.body) -
+                    3)   # don’t penalize the starting length
+        rate = SHRINK_RATE_MS_BASE - extra * 150   # 150ms faster per extra segment
+        return max(SHRINK_RATE_MS_MIN, rate)
+
+    def _process_idle_shrink(self):
+        """Handle idle-time shrinking, dynamic rate, and death at zero length."""
+        now = pygame.time.get_ticks()
+
+        # If enough time has passed without eating, start (or continue) shrinking
+        idle_ms = now - self.last_eat_ms
+        if idle_ms >= SHRINK_START_MS:
+            # schedule the first shrink if we haven't yet
+            if self.next_shrink_due is None:
+                self.next_shrink_due = now + self._current_shrink_rate_ms()
+
+        # perform a shrink if we're past due
+            if now >= self.next_shrink_due:
+                # remove one tail segment
+                self.snake.shrink(1)
+
+                if not self.snake.is_dead:
+                    # schedule the next shrink based on *current* length
+                    self.next_shrink_due = now + self._current_shrink_rate_ms()
+            # if dead, the caller (update) will early-out this frame
 
     def update(self):
         """TODO: Write documentation"""
         self.snake.move()
+        self._process_idle_shrink()     # <-- ADD-ONLY
+        if self.snake.is_dead:          # if shrink killed us, skip further checks this frame
+            return
+        self.shrinking_border.update()
         self.check_collisions()
 
     def draw_elements(self):
@@ -68,6 +126,12 @@ class Main:
         if self.food.is_spawned:
             self.food.draw()
         self.snake.draw()
+        ##### JACOB'S CHANGES#####
+        # Draw speed boost if spawned (ADD-ONLY)
+        if getattr(self.speed_boost, "is_spawned", False):
+            self.speed_boost.draw()
+
+        self.shrinking_border.draw(screen)
 
     def check_collisions(self):
         """TODO: Write documentation"""
@@ -76,19 +140,273 @@ class Main:
         if not 0 <= head.x < num_cells or not 0 <= head.y < num_cells:
             self.game_over()
 
+        # Check if the snake is in the danger zone
+        if self.shrinking_border.is_in_danger_zone(head):
+            # Only apply damage if cooldown has passed
+            if self.shrinking_border.wave_shrink_amount > 0 and self.shrinking_border.can_apply_damage():
+                # Check if this damage would kill the snake (shrink below 1 segment)
+                if len(self.snake.body) - self.shrinking_border.wave_shrink_amount < 1:
+                    self.game_over()
+                else:
+                    self.snake.grow(-self.shrinking_border.wave_shrink_amount)
+
         # Check if the snake ate food and draw new food
         if self.snake.body[0] == self.food.pos:
             self.food.effect(self.snake)
             self.food.set_random_pos(self.snake.body)
+            #### SHRINK CHANGES#####
+            self.last_eat_ms = pygame.time.get_ticks()
+            self.next_shrink_due = None
 
         # Check if the head of the snake hits itself
         for body_segment in self.snake.body[1:]:
             if head == body_segment:
                 self.game_over()
 
+        ##### JACOB'S CHANGES#####
+        # Check if the snake picked up a speed boost (ADD-ONLY)
+        if getattr(self.speed_boost, "is_spawned", False) and self.snake.body[0] == self.speed_boost.pos:
+            self.speed_boost.effect(self.snake)
+
+        # Occasionally spawn a speed boost if none is active on the field (ADD-ONLY)
+        if not self.speed_boost.is_spawned and random.random() < 0.005:
+            # Ensure it doesn't spawn inside the snake or on top of food
+            while True:
+                self.speed_boost.set_random_pos(self.snake.body)
+                if (not self.food.is_spawned) or (self.speed_boost.pos != self.food.pos):
+                    break
+            self.speed_boost.is_spawned = True
+
     def game_over(self):
         """TODO: Write documentation"""
         self.snake.is_dead = True
+
+
+class ShrinkingBorder():
+    """Handles the shrinking border battle royale element with multiple
+    waves that cause more shrinking damage to the snake over time."""
+
+    def __init__(self, num_cells, cell_size):
+        """Initializes the shrinking border.
+
+        Args:
+            num_cells(int): Number of cells in the grid
+            cell_size (int): Size of each cell in pixels
+        """
+        self.num_cells = num_cells
+        self.cell_size = cell_size
+        # Current border thickness (in cells from edge)
+        self.current_border = 0
+        self.target_border = 0  # Target border thickness for current wave
+        self.is_shrinking = False
+        self.shrink_start_time = 0
+        self.wave_shrink_amount = 0
+        self.game_start_time = time.time()
+        self.last_damage_time = 0  # Track when damage was last applied
+        self.damage_cooldown = 0.5  # Damage every 0.5 seconds
+
+        # Wave configuration: (delay_seconds, target_border_cells,
+        # shrink_duration_seconds, wave_shrink_amount)
+        self.waves = [
+            (30, 1, 10, 1),  # Wave 1: After 30s, shrink to 1 cell from edge over 10s
+            (60, 2, 10, 1),  # Wave 2: After 60s, shrink to 2 cells from edge over 10s
+            (75, 3, 10, 1),  # Wave 3: After 75s, shrink to 3 cells from edge over 10s
+            (90, 4, 7.5, 2),  # Wave 4: After 90s, shrink to 4 cells from edge over 7.5s
+            # Wave 5: After 115s, shrink to 10 cells from edge over 5s (final shrink)
+            (115, 10, 5, 3),
+        ]
+
+        self.current_wave_index = 0
+        self.shrink_duration = 0
+
+        # Visual properties
+        self.warning_color = (255, 165, 0, 100)
+        self.danger_color = (255, 0, 0, 150)
+        self.safe_color = (0, 255, 0, 50)
+
+    def reset(self):
+        """Resets the border for a new game."""
+        self.current_border = 0
+        self.target_border = 0
+        self.is_shrinking = False
+        self.current_wave_index = 0
+        self.wave_shrink_amount = 0
+        self.game_start_time = time.time()
+        self.last_damage_time = 0
+
+    def update(self):
+        """Updates the border state based on elapsed time."""
+        elapsed_time = time.time() - self.game_start_time
+
+        # Check if a new wave needs to start
+        if self.current_wave_index < len(self.waves):
+            wave_delay, target_border, duration, shrink_amount = self.waves[
+                self.current_wave_index]
+
+            if elapsed_time >= wave_delay and not self.is_shrinking:
+                # Start shrinking for this wave
+                self.is_shrinking = True
+                self.target_border = target_border
+                self.shrink_start_time = time.time()
+                self.shrink_duration = duration
+                self.wave_shrink_amount = shrink_amount
+                self.current_wave_index += 1
+
+        # Update border position if shrinking
+        if self.is_shrinking:
+            shrink_elapsed = time.time() - self.shrink_start_time
+            progress = min(shrink_elapsed / self.shrink_duration, 1.0)
+
+            # Calculate current border with smooth interpolation
+            start_border = self.waves[self.current_wave_index -
+                                      1][1] if self.current_wave_index > 1 else 0
+            if self.current_wave_index > 0:
+                prev_target = self.waves[self.current_wave_index -
+                                         2][1] if self.current_wave_index > 1 else 0
+                start_border = prev_target
+
+            self.current_border = start_border + \
+                (self.target_border - start_border) * progress
+
+            # Stop shrinking when complete
+            if progress >= 1.0:
+                self.is_shrinking = False
+                self.current_border = self.target_border
+
+    def draw(self, screen):
+        """Draws the shrinking border to the game environment.
+
+        Args:
+            screen (pygame.Surface): The game screen surface
+        """
+        if self.current_border <= 0:
+            return
+
+        border_thickness_pixels = int(self.current_border * self.cell_size)
+        screen_width = self.num_cells * self.cell_size
+        screen_height = self.num_cells * self.cell_size
+
+        # Determine color based on state
+        if self.is_shrinking:
+            color = self.warning_color
+        else:
+            color = self.danger_color
+
+        # Create a transparent surface for the border
+        border_surface = pygame.Surface(
+            (screen_width, screen_height), pygame.SRCALPHA)
+
+        # Draw the four border rectangles
+        # Top border
+        pygame.draw.rect(border_surface, color,
+                         (0, 0, screen_width, border_thickness_pixels))
+
+        # Bottom border
+        pygame.draw.rect(border_surface, color, (0, screen_height -
+                         border_thickness_pixels, screen_width, border_thickness_pixels))
+
+        # Left border
+        pygame.draw.rect(border_surface, color,
+                         (0, 0, border_thickness_pixels, screen_height))
+
+        # Right border
+        pygame.draw.rect(border_surface, color, (screen_width -
+                         border_thickness_pixels, 0, border_thickness_pixels, screen_height))
+
+        # Blit the border to the screen
+        screen.blit(border_surface, (0, 0))
+
+        # Draw warning lines at the inner edge
+        line_color = (255, 0, 0) if not self.is_shrinking else (255, 165, 0)
+        line_width = 3
+
+        # Top line
+        pygame.draw.line(screen, line_color,
+                         (border_thickness_pixels, border_thickness_pixels),
+                         (screen_width - border_thickness_pixels,
+                          border_thickness_pixels),
+                         line_width)
+
+        # Bottom line
+        pygame.draw.line(screen, line_color,
+                         (border_thickness_pixels,
+                          screen_height - border_thickness_pixels),
+                         (screen_width - border_thickness_pixels,
+                          screen_height - border_thickness_pixels),
+                         line_width)
+
+        # Left line
+        pygame.draw.line(screen, line_color,
+                         (border_thickness_pixels, border_thickness_pixels),
+                         (border_thickness_pixels,
+                          screen_height - border_thickness_pixels),
+                         line_width)
+
+        # Right line
+        pygame.draw.line(screen, line_color,
+                         (screen_width - border_thickness_pixels,
+                          border_thickness_pixels),
+                         (screen_width - border_thickness_pixels,
+                          screen_height - border_thickness_pixels),
+                         line_width)
+
+    def is_in_danger_zone(self, pos):
+        """Check if a position is in the danger zone (border area).
+
+        Args:
+            pos (Vector2): Position to check (in grid coordinates)
+
+        Returns:
+            bool: True if position is in danger zone, False otherwise
+        """
+        border_cells = int(self.current_border)
+
+        if pos.x < border_cells or pos.x >= self.num_cells - border_cells:
+            return True
+        if pos.y < border_cells or pos.y >= self.num_cells - border_cells:
+            return True
+
+        return False
+
+    def can_apply_damage(self):
+        """Check if enough time has passed to apply damage again.
+
+        Returns:
+            bool: True if damage can be applied, False otherwise
+        """
+        current_time = time.time()
+        if current_time - self.last_damage_time >= self.damage_cooldown:
+            self.last_damage_time = current_time
+            return True
+        return False
+
+    def get_safe_bounds(self):
+        """Get the current safe playing area bounds.
+
+        Returns:
+            tuple: (min_x, min_y, max_x, max_y) in grid coordinates
+        """
+        border_cells = int(self.current_border)
+        return (
+            border_cells,
+            border_cells,
+            self.num_cells - border_cells - 1,
+            self.num_cells - border_cells - 1
+        )
+
+    def get_time_to_next_wave(self):
+        """Get time remaining until the next shrinking wave.
+
+        Returns:
+            float: Seconds until next wave, or -1 if no more waves
+        """
+        if self.current_wave_index >= len(self.waves):
+            return -1
+
+        elapsed_time = time.time() - self.game_start_time
+        next_wave_time = self.waves[self.current_wave_index][0]
+
+        return max(0, next_wave_time - elapsed_time)
 
 
 class PowerUp(ABC):
@@ -153,6 +471,41 @@ class Food(CollectibleItem):
         """TODO: Write documentation"""
         Snake.grow(snake)
 
+####### JACOB'S CHANGES#######
+
+
+class SpeedBoost(CollectibleItem):
+    """A pickup that temporarily speeds up the game tick (snake moves faster)."""
+    color = (255, 165, 0)   # orange block
+    duration_ms = 5000      # 5 seconds
+    is_spawned = False
+
+    def __init__(self):
+        super().__init__()
+        # Ensure it's a Vector2 from the start
+        self.pos = pygame.math.Vector2(-1, -1)
+
+    def set_random_pos(self, snake_body):
+        """Ensure we always choose a free cell; prefer parent logic but keep it explicit."""
+        while True:
+            x = random.randint(0, num_cells - 1)
+            y = random.randint(0, num_cells - 1)
+            candidate = pygame.math.Vector2(x, y)
+            # Avoid spawning on the snake or on top of food (if you pass food pos)
+            if candidate not in snake_body:
+                self.pos = candidate
+                return
+
+    def effect(self, snake):
+        # Apply boost
+        pygame.time.set_timer(UPDATE_SCREEN, BOOST_TICK_MS)
+        # Schedule end (Pygame 2 supports one-shot via third arg True)
+        pygame.time.set_timer(SPEED_BOOST_END, self.duration_ms, True)
+        # Despawn immediately so it's not drawn again
+        self.is_spawned = False
+        # Move it off-board defensively (in case any stale draw gets called)
+        self.pos = pygame.math.Vector2(-1, -1)
+
 
 class FoodSpawner():
     """TODO: CURRENTLY UNIMPLEMENTED (needs documentation)
@@ -176,7 +529,7 @@ class Snake:
         self.is_dead = False
 
     def draw(self):
-        """TODO: Write documentation"""
+        """Draw the snake body and add eyes to the head."""
         for body_segment in self.body:
             x = int(body_segment.x * cell_size)
             y = int(body_segment.y * cell_size)
@@ -186,15 +539,12 @@ class Snake:
             body_color = (3, 252, 86)
             pygame.draw.rect(screen, body_color, body_rect)
 
-            left = pygame.Vector2(body_segment.x-1, body_segment.y)
-            right = pygame.Vector2(body_segment.x+1, body_segment.y)
-            up = pygame.Vector2(body_segment.x, body_segment.y-1)
-            down = pygame.Vector2(body_segment.x, body_segment.y+1)
+            left = pygame.Vector2(body_segment.x - 1, body_segment.y)
+            right = pygame.Vector2(body_segment.x + 1, body_segment.y)
+            up = pygame.Vector2(body_segment.x, body_segment.y - 1)
+            down = pygame.Vector2(body_segment.x, body_segment.y + 1)
             border_color = (0, 0, 0)
 
-            # Draw black border around the snake body, different edges
-            # for each block. Check the neighbor of each body segment to
-            # decide which sides need borders
             if left not in self.body:
                 pygame.draw.line(screen, border_color,
                                  body_rect.topleft, body_rect.bottomleft, 2)
@@ -207,6 +557,33 @@ class Snake:
             if down not in self.body:
                 pygame.draw.line(screen, border_color,
                                  body_rect.bottomleft, body_rect.bottomright, 2)
+
+        # --- ADD ONLY EYES TO HEAD ---
+        if not self.body:
+            return
+
+        head = self.body[0]
+        hx, hy = int(head.x * cell_size), int(head.y * cell_size)
+        head_rect = pygame.Rect(hx, hy, cell_size, cell_size)
+
+        eye_r = 4
+        off = 8
+        if self.direction == Vector2(1, 0):        # right
+            eyes = [(head_rect.right - off, head_rect.top + off),
+                    (head_rect.right - off, head_rect.bottom - off)]
+        elif self.direction == Vector2(-1, 0):     # left
+            eyes = [(head_rect.left + off, head_rect.top + off),
+                    (head_rect.left + off, head_rect.bottom - off)]
+        elif self.direction == Vector2(0, -1):     # up
+            eyes = [(head_rect.left + off, head_rect.top + off),
+                    (head_rect.right - off, head_rect.top + off)]
+        else:                                      # down
+            eyes = [(head_rect.left + off, head_rect.bottom - off),
+                    (head_rect.right - off, head_rect.bottom - off)]
+
+        for e in eyes:
+            pygame.draw.circle(screen, (255, 255, 255), e, eye_r)  # white eye
+            pygame.draw.circle(screen, (0, 0, 0), e, 2)
 
     def move(self):
         """TODO: Write documentation"""
@@ -229,9 +606,35 @@ class Snake:
         # self.body = body_copy[:]
 
     def grow(self, num_growths=1):
-        """TODO: Write documentation"""
-        self.pending_growth += num_growths
-        self.length += num_growths
+        """Grows or shrinks the snake.
+
+        Args:
+            num_growths (int): Number of segments to grow (positive) or
+            shrink (negative)
+        """
+        # Handle negative growth (shrinking)
+        if num_growths < 0:
+            # Remove segments from the tail immediately
+            segments_to_remove = abs(num_growths)
+            for _ in range(segments_to_remove):
+                if len(self.body) > 1:  # Keep at least the head
+                    self.body.pop()
+            self.length = len(self.body)
+            # Don't change pending_growth for negative values
+        else:
+            # Positive growth - add to pending
+            self.pending_growth += num_growths
+            self.length += num_growths
+
+    def shrink(self, n=1):
+        """Remove n tail segments. If length hits 0, mark snake dead."""
+        for _ in range(n):
+            if len(self.body) > 0:
+                self.body.pop()
+                self.length = len(self.body)
+            if len(self.body) == 0:
+                self.is_dead = True
+                break
 
 
 def play_music(music):
@@ -383,14 +786,29 @@ def main_menu():
                 if event.button == 1:
                     click = True
         pygame.display.update()
-        game_clock.tick(60)
+        game_clock.tick(120)  # default value is 60 currently testing
+
+
+def reset_speed_boost_state(game):
+    """Reset timers and despawn any existing speed boost."""
+    pygame.time.set_timer(
+        SPEED_BOOST_END, 0)              # stop the one-shot end timer
+    # restore normal speed
+    pygame.time.set_timer(UPDATE_SCREEN, BASE_TICK_MS)
+    if hasattr(game, "speed_boost"):
+        game.speed_boost.is_spawned = False
+        game.speed_boost.pos = pygame.math.Vector2(-1, -1)
 
 
 def start_game():
     """The actual game loop. Handles all snake game logic."""
     game = Main()  # Create the snake and food
+
+    reset_speed_boost_state(game)  # ensure no leftover boost/timers
+
     food = game.food
     snake = game.snake
+    game.shrinking_border.reset()
     # Trigger screen update event every 150ms
     pygame.time.set_timer(UPDATE_SCREEN, 150)
 
@@ -460,6 +878,11 @@ def start_game():
                     game.update()
                     is_snake_movable = True  # After the screen is updated, the snake can move again
 
+            ##### JACOB'S CHANGES#####
+            elif event.type == SPEED_BOOST_END:
+                # Restore normal tick rate when boost expires (ADD-ONLY)
+                pygame.time.set_timer(UPDATE_SCREEN, BASE_TICK_MS)
+
         game.draw_elements()
         pygame.display.update()
         game_clock.tick(60)
@@ -469,6 +892,10 @@ def start_game():
             continue_playing = game_over()
             if continue_playing:
                 game = Main()
+
+                # ensure no leftover boost/timers
+                reset_speed_boost_state(game)
+
                 food = game.food
                 snake = game.snake
                 game_not_started = True
@@ -699,4 +1126,10 @@ def settings():
         game_clock.tick(60)
 
 
-main_menu()
+if __name__ == "__main__":
+    pygame.init()
+    pygame.display.set_caption('Super Snake Battle Royale Ultimate')
+    # recreate screen in case module-level initialization was removed/moved:
+    screen = set_mode(WINDOWED_MODE)
+    SCREEN_WIDTH, SCREEN_HEIGHT = screen.get_width(), screen.get_height()
+    main_menu()
