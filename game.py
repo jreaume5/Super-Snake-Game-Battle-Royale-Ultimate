@@ -21,25 +21,10 @@ FULLSCREEN_MODE = "fullscreen"
 current_display_mode = WINDOWED_MODE
 UPDATE_SCREEN = pygame.USEREVENT  # screen update
 
-######JACOB'S CHANGES#######
+###### JACOB'S CHANGES#######
 # --- Speed Boost constants---
 BASE_TICK_MS = 110  # default is 150, currently testing
 BOOST_TICK_MS = 70  # default is 90 currently testing
-SPEED_BOOST_END = pygame.USEREVENT + 1  # one-shot event to end the boost
-
-###SHRINK CONSTANTS -JACOB-######
-# --- Idle Shrink constants ---
-SHRINK_START_MS = 8000          # time after last eat before shrinking starts
-SHRINK_RATE_MS_BASE = 2500      # base interval between shrinks once active
-SHRINK_RATE_MS_MIN = 900        # cap so it never becomes too fast
-SHRINK_FLASH_WARNING_MS = 1000  # start flashing this long before a shrink
-
-###### JACOB'S CHANGES#######
-# --- Speed Boost constants---
-# default is 150, currently testing        # Your current update tick in start_game()
-BASE_TICK_MS = 110
-# default is 90 currently testing        # Faster tick while boost is active
-BOOST_TICK_MS = 70
 SPEED_BOOST_END = pygame.USEREVENT + 1  # one-shot event to end the boost
 
 ### SHRINK CONSTANTS -JACOB-######
@@ -81,17 +66,19 @@ class Main:
         self.snake = Snake()
         self.food = Food()
         self.food_spawner = FoodSpawner()
-        #####JACOB'S CHANGES#####
+        ##### JACOB'S CHANGES#####
         self.speed_boost = SpeedBoost()
-        #####SHRINK CHANGES#####
+        ##### SHRINK CHANGES#####
         # --- Idle Shrink---
         self.last_eat_ms = pygame.time.get_ticks()  # reset when food eaten
         self.next_shrink_due = None                 # when the next shrink happens
+        self.shrinking_border = ShrinkingBorder()
 
-    ###SHRINK CHANGES#####
+    ### SHRINK CHANGES#####
     def _current_shrink_rate_ms(self):
         """Shrink a bit faster as the snake gets longer (simple linear scaling)."""
-        extra = max(0, len(self.snake.body) - 3)   # don’t change the starting length
+        extra = max(0, len(self.snake.body) -
+                    3)   # don’t change the starting length
         rate = SHRINK_RATE_MS_BASE - extra * 150   # 150ms faster per extra segment
         return max(SHRINK_RATE_MS_MIN, rate)
 
@@ -129,7 +116,7 @@ class Main:
         if self.food.is_spawned:
             self.food.draw()
         self.snake.draw()
-        #####JACOB'S CHANGES#####
+        ##### JACOB'S CHANGES#####
         # Draw speed boost if spawned
         if getattr(self.speed_boost, "is_spawned", False):
             self.speed_boost.draw()
@@ -155,7 +142,7 @@ class Main:
         if self.snake.body[0] == self.food.pos:
             self.food.effect(self.snake)
             self.food.set_random_pos(self.snake.body)
-            ####SHRINK CHANGES#####
+            #### SHRINK CHANGES#####
             self.last_eat_ms = pygame.time.get_ticks()
             self.next_shrink_due = None
 
@@ -164,7 +151,7 @@ class Main:
             if head == body_segment:
                 self.game_over()
 
-        #####JACOB'S CHANGES#####
+        ##### JACOB'S CHANGES#####
         # Check if the snake picked up a speed boost
         if getattr(self.speed_boost, "is_spawned", False) and self.snake.body[0] == self.speed_boost.pos:
             self.speed_boost.effect(self.snake)
@@ -502,7 +489,7 @@ class SpeedBoost(CollectibleItem):
         self.pos = pygame.math.Vector2(-1, -1)
 
 
-#######JACOB'S CHANGES#######
+####### JACOB'S CHANGES#######
 class SpeedBoost(CollectibleItem):
     """A pickup that temporarily speeds up the game tick (snake moves faster)."""
     color = (255, 165, 0)   # orange block
@@ -552,7 +539,8 @@ class Snake:
     ):
         # Default to your original starting body if none given
         if start_body is None:
-            start_body = [pygame.Vector2(6, 10), Vector2(5, 10), Vector2(4, 10)]
+            start_body = [pygame.Vector2(
+                6, 10), Vector2(5, 10), Vector2(4, 10)]
 
         # Make a copy to avoid aliasing
         self.body = [Vector2(seg.x, seg.y) for seg in start_body]
@@ -645,8 +633,22 @@ class Snake:
 
 
 def play_music(music):
-    """Credit for music goes to Newgrounds user ZaneLittle."""
-    return
+    """Credit for music goes to Newgrounds user ZaneLittle: https://www.newgrounds.com/audio/listen/1475739"""
+    pygame.mixer.music.stop()
+    match music:
+        case "main_menu":
+            pygame.mixer.music.load('./music/main_menu_music.wav')
+        case "game":
+            pygame.mixer.music.load('./music/game_music.wav')
+        case "sim":
+            pygame.mixer.music.load('./music/sim_music.wav')
+        case "game_over":
+            pygame.mixer.music.load('./music/game_over_music.wav')
+        case "pause_menu":
+            pygame.mixer.music.load('./music/pause_menu_music.wav')
+        case _:
+            return  # Unknown music type, do nothing
+    pygame.mixer.music.play(-1)
 
 
 def draw_button(surface, button, text, font, bg_color, text_color):
@@ -875,7 +877,7 @@ def game_over():
 
 # ================= MULTI-SNAKE RL ENVIRONMENT ==================
 
-#actions: turn left, go straight, turn right
+# actions: turn left, go straight, turn right
 ACTION_LEFT = 0
 ACTION_STRAIGHT = 1
 ACTION_RIGHT = 2
@@ -996,7 +998,8 @@ class BattleEnv4Snakes:
         fy = nearest_food_pos.y - head.y
 
         food_left = 1.0 if (fx * left_dir.x + fy * left_dir.y) > 0 else 0.0
-        food_forward = 1.0 if (fx * forward_dir.x + fy * forward_dir.y) > 0 else 0.0
+        food_forward = 1.0 if (fx * forward_dir.x + fy *
+                               forward_dir.y) > 0 else 0.0
         food_right = 1.0 if (fx * right_dir.x + fy * right_dir.y) > 0 else 0.0
 
         dx = forward_dir.x
@@ -1029,9 +1032,12 @@ class BattleEnv4Snakes:
 
         # 4 starting snakes in each corner, facing inside
         starts = [
-            [Vector2(3, 3), Vector2(2, 3), Vector2(1, 3)],                                     # top-left
-            [Vector2(num_cells - 4, 3), Vector2(num_cells - 5, 3), Vector2(num_cells - 6, 3)],  # top-right
-            [Vector2(3, num_cells - 4), Vector2(2, num_cells - 4), Vector2(1, num_cells - 4)],  # bottom-left
+            [Vector2(3, 3), Vector2(2, 3), Vector2(1, 3)
+             ],                                     # top-left
+            [Vector2(num_cells - 4, 3), Vector2(num_cells - 5, 3),
+             Vector2(num_cells - 6, 3)],  # top-right
+            [Vector2(3, num_cells - 4), Vector2(2, num_cells - 4),
+             Vector2(1, num_cells - 4)],  # bottom-left
             [Vector2(num_cells - 4, num_cells - 4),
              Vector2(num_cells - 5, num_cells - 4),
              Vector2(num_cells - 6, num_cells - 4)],
@@ -1065,7 +1071,8 @@ class BattleEnv4Snakes:
 
         self.alive = [True] * self.num_snakes
         self.no_progress_steps = [0] * self.num_snakes  # reset stall counters
-        self.steps_since_food = [0] * self.num_snakes   # reset starvation counters
+        # reset starvation counters
+        self.steps_since_food = [0] * self.num_snakes
 
         return self._get_all_states()
 
@@ -1089,7 +1096,8 @@ class BattleEnv4Snakes:
                 continue
             head = s.body[0]
             nearest_food_pos = self._nearest_food_pos(head)
-            dists_before[i] = abs(head.x - nearest_food_pos.x) + abs(head.y - nearest_food_pos.y)
+            dists_before[i] = abs(head.x - nearest_food_pos.x) + \
+                abs(head.y - nearest_food_pos.y)
 
         # Set directions from relative actions
         for i, s in enumerate(self.snakes):
@@ -1148,7 +1156,8 @@ class BattleEnv4Snakes:
             if self.alive[i] and len(s.body) > 0:
                 head = s.body[0]
                 nearest_food_pos = self._nearest_food_pos(head)
-                dist_after = abs(head.x - nearest_food_pos.x) + abs(head.y - nearest_food_pos.y)
+                dist_after = abs(head.x - nearest_food_pos.x) + \
+                    abs(head.y - nearest_food_pos.y)
                 dist_before = dists_before[i]
 
                 if dist_after < dist_before:
@@ -1199,7 +1208,8 @@ class BattleEnv4Snakes:
         if self.max_steps is None:
             env_done = (alive_count == 0)
         else:
-            env_done = (self.step_count >= self.max_steps) or (alive_count == 0)
+            env_done = (self.step_count >= self.max_steps) or (
+                alive_count == 0)
 
         for i in range(self.num_snakes):
             dones[i] = (not self.alive[i]) or env_done
@@ -1245,13 +1255,16 @@ class DQNNumPy:
         self.state_dim = state_dim
         self.action_dim = action_dim
 
-        self.W1 = np.random.randn(state_dim, hidden1).astype(np.float32) / np.sqrt(state_dim)
+        self.W1 = np.random.randn(state_dim, hidden1).astype(
+            np.float32) / np.sqrt(state_dim)
         self.b1 = np.zeros(hidden1, dtype=np.float32)
 
-        self.W2 = np.random.randn(hidden1, hidden2).astype(np.float32) / np.sqrt(hidden1)
+        self.W2 = np.random.randn(hidden1, hidden2).astype(
+            np.float32) / np.sqrt(hidden1)
         self.b2 = np.zeros(hidden2, dtype=np.float32)
 
-        self.W3 = np.random.randn(hidden2, action_dim).astype(np.float32) / np.sqrt(hidden2)
+        self.W3 = np.random.randn(hidden2, action_dim).astype(
+            np.float32) / np.sqrt(hidden2)
         self.b3 = np.zeros(action_dim, dtype=np.float32)
 
     def _relu(self, x):
@@ -1383,7 +1396,8 @@ class MultiSnakeAgent:
         if len(self.replay) < self.batch_size:
             return
 
-        states, actions, rewards, next_states, dones = self.replay.sample(self.batch_size)
+        states, actions, rewards, next_states, dones = self.replay.sample(
+            self.batch_size)
 
         q_next = self.target_net.predict_batch(next_states)
         max_next = np.max(q_next, axis=1)
@@ -1418,7 +1432,8 @@ def train_multi_snake(env, agent, num_episodes=10, max_steps_per_episode=None):
             next_states, rewards, dones, info = env.step(actions)
 
             for i in range(env.num_snakes):
-                agent.remember(states[i], actions[i], rewards[i], next_states[i], dones[i])
+                agent.remember(states[i], actions[i],
+                               rewards[i], next_states[i], dones[i])
                 episode_rewards[i] += rewards[i]
 
             agent.train_step()
@@ -1427,7 +1442,8 @@ def train_multi_snake(env, agent, num_episodes=10, max_steps_per_episode=None):
             if all(dones):
                 break
 
-        print(f"Episode {episode + 1}/{num_episodes}, rewards per snake: {episode_rewards}")
+        print(
+            f"Episode {episode + 1}/{num_episodes}, rewards per snake: {episode_rewards}")
 
 
 def run_visual_episode(env, agent, fps=10):
@@ -1476,6 +1492,7 @@ def run_visual_episode(env, agent, fps=10):
                 pygame.quit()
                 sys.exit()
             elif event.type == KEYDOWN and event.key == K_ESCAPE:
+                play_music("sim")
                 running_vis = False
 
         # Choose actions for each snake
@@ -1484,7 +1501,7 @@ def run_visual_episode(env, agent, fps=10):
             if env.alive[i]:
                 a = agent.select_action_greedy(states[i])
             else:
-                a = ACTION_STRAIGHT  #doesn't matter, snake is dead
+                a = ACTION_STRAIGHT  # doesn't matter, snake is dead
             actions.append(a)
 
         # Step environment
@@ -1524,6 +1541,7 @@ def run_visual_episode(env, agent, fps=10):
 
 # ================== SIMULATION / RL MENU ======================
 
+
 def start_sim():
     """Simulation / RL mode menu + control."""
     play_music("sim")
@@ -1562,11 +1580,35 @@ def start_sim():
                     running = False
                 elif event.key == K_r:
                     # Visualize current policy (greedy)
+                    play_music("game")
                     run_visual_episode(env, agent, fps=10)
                 elif event.key == K_t:
-                    # Train in console only
-                    train_multi_snake(env, agent, num_episodes=1000)
+                    screen.fill((250, 250, 250))
+                    draw_text('Simulation', font,
+                              (5, 15, 10), screen, SCREEN_WIDTH//2, 100)
+                    draw_text('Press R to run simulation on screen', font2,
+                              (5, 15, 10), screen, SCREEN_WIDTH//2, 200)
+                    draw_text('Press T to simulate training', font2,
+                              (5, 15, 10), screen, SCREEN_WIDTH//2, 250)
+                    draw_text('ESC - Return to main menu', font2,
+                              (5, 15, 10), screen, SCREEN_WIDTH//2, 300)
+                    draw_text('Training in progress...', font2,
+                              (120, 0, 0), screen, SCREEN_WIDTH//2, 350)
+                    pygame.display.update()
+                    train_multi_snake(env, agent, num_episodes=5000)
                     training_done = True
+                    play_music("sim")
+                    screen.fill((250, 250, 250))
+                    draw_text('Simulation', font,
+                              (5, 15, 10), screen, SCREEN_WIDTH//2, 100)
+                    draw_text('Press R to run simulation on screen', font2,
+                              (5, 15, 10), screen, SCREEN_WIDTH//2, 200)
+                    draw_text('Press T to simulate training', font2,
+                              (5, 15, 10), screen, SCREEN_WIDTH//2, 250)
+                    draw_text('ESC - Return to main menu', font2,
+                              (5, 15, 10), screen, SCREEN_WIDTH//2, 300)
+                    draw_text('Simulation complete!', font2,
+                              (0, 120, 0), screen, SCREEN_WIDTH//2, 350)
 
         pygame.display.update()
         game_clock.tick(60)
