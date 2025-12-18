@@ -66,3 +66,10 @@ A game window titled “Super Snake Game Battle Royale Ultimate” will open.
 - If the game window opens but does not respond to input, click once inside the window to focus it.
 - Training may take several minutes depending on the number of episodes and system performance.
 - The virtual environment directory (`.venv/`) should not be committed to GitHub.
+
+## Technologies Used
+- Python
+- Pygame
+- NumPy
+- Deep Reinforcement Learning (DQN)
+- Multi-Agent Simulation
