@@ -7,5 +7,9 @@ This project demonstrates multi-agents reinforcement learning, game-state encodi
 ```bash 
 git clone https://github.com/jreaume5/Super-Snake-Game-Battle-Royale-Ultimate.git
 cd Super-Snake-Game-Battle-Royale-Ultimate
+```
 
+## Requirements
+- Python 3.9+ (Python 3.10+ recommended)
+- Works on Windows and macOS
 
