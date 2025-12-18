@@ -55,3 +55,9 @@ A game window titled “Super Snake Game Battle Royale Ultimate” will open.
 - After training completes, press R to run a visual simulation using the trained agent
 ### 3. Press ESC at any time to return to the main menu
 
+## Controls
+### Simulation Mode
+- T – Train AI agents
+- R – Run trained agent visually
+- ESC – Return to main menu
+
