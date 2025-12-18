@@ -13,3 +13,30 @@ cd Super-Snake-Game-Battle-Royale-Ultimate
 - Python 3.9+ (Python 3.10+ recommended)
 - Works on Windows and macOS
 
+## Setup Instructions
+### 1) Create a virtual environment (recommended but not required)
+**macOS / Linux**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+**Windows (PowerShell)**
+```bash
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+### 2) Install dependencies
+```bash
+pip install -r requirements.txt
+```
+### 3) Run the program
+**macOS / Linux**
+```bash
+python3 game.py
+```
+**Windows alternative**
+```bash
+py game.py
+```
+A game window titled “Super Snake Game Battle Royale Ultimate” will open.
+
