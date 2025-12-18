@@ -40,3 +40,18 @@ py game.py
 ```
 A game window titled “Super Snake Game Battle Royale Ultimate” will open.
 
+## Using the Game
+### Main Menu Options
+- Start Game (Human-controlled mode — currently not used for grading; Simulation mode should be used instead)
+- Simulation (Primary mode — used for training and demonstrating the neural-network agents)
+- Settings (Volume control)
+- Quit (Exit the program)
+
+## Simulation Mode (Neural Network Training)
+### 1. From the main menu, select Simulation
+### 2. On the Simulation screen:
+- Press T to train the AI agents
+    - Training progress prints in the terminal (episode rewards)
+- After training completes, press R to run a visual simulation using the trained agent
+### 3. Press ESC at any time to return to the main menu
+
