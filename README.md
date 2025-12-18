@@ -61,3 +61,8 @@ A game window titled “Super Snake Game Battle Royale Ultimate” will open.
 - R – Run trained agent visually
 - ESC – Return to main menu
 
+## Notes & Troubleshooting
+- The `music/` directory must be present in the project root when running the program.
+- If the game window opens but does not respond to input, click once inside the window to focus it.
+- Training may take several minutes depending on the number of episodes and system performance.
+- The virtual environment directory (`.venv/`) should not be committed to GitHub.
